@@ -38,7 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-[#141414] text-gray-900 dark:text-white font-body-lg h-screen overflow-hidden flex flex-col transition-colors duration-300">
+    <div className="bg-gray-50 dark:bg-[#141414] text-gray-900 dark:text-white font-body-lg h-screen overflow-hidden flex flex-col">
       
       <Header onMenuClick={toggleSidebar} />
 

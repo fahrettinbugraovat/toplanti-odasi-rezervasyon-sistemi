@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import AppLayout from './components/layout/AppLayout';
 import { ThemeProvider } from './context/ThemeContext';
+import { ReservationProvider } from './context/ReservationContext';
 
 export const metadata: Metadata = {
   title: 'RoomReserve - Panel Özeti',
@@ -30,9 +31,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
-          <AppLayout>
-            {children}
-          </AppLayout>
+          <ReservationProvider>
+            <AppLayout>
+              {children}
+            </AppLayout>
+          </ReservationProvider>
         </ThemeProvider>
       </body>
     </html>

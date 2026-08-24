@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '../../context/ThemeContext';
 
-// isExpanded prop'u eklendi
 interface SidebarProps {
   onClose: () => void;
   isExpanded?: boolean; 
@@ -16,7 +15,6 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
   
   const getLinkClass = (path: string) => {
     const isActive = pathname === path;
-    // Menü kapalıysa (mini mod) yazıları gizle ve ikonları tam ortaya hizala
     return `flex items-center ${isExpanded ? 'gap-3 px-3' : 'justify-center px-0'} py-3 rounded-lg text-sm transition-colors border-l-[3px] relative ${
       isActive ? 'text-gray-900 dark:text-white font-bold border-[#E4032C] bg-gray-100 dark:bg-[#2a2a2a]' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white border-transparent font-semibold'
     }`;
@@ -33,9 +31,9 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
 
   return (
     <>
-      <nav className="flex flex-col h-full py-4 bg-white dark:bg-[#1c1c1c] transition-all duration-300 overflow-y-auto overflow-x-hidden">
+      <nav className="flex flex-col h-full py-4 bg-white dark:bg-[#1c1c1c] overflow-y-auto overflow-x-hidden">
         
-        {/* LİNKLER (Mini modda isimleri görmek için title="..." eklendi) */}
+        {/* LİNKLER */}
         <ul className={`flex flex-col gap-2 flex-grow ${isExpanded ? 'px-4' : 'px-3'}`}>
           <li>
             <Link href="/" onClick={(event) => navigateToTab(event, '/')} className={getLinkClass('/')} title="Panel Özeti">
@@ -63,16 +61,17 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
           </li>
         </ul>
         
-        {/* ALT KISIM (Ayarlar, Tema, Çıkış Yap vs.) */}
+        {/* ALT KISIM */}
         <div className={`mt-5 flex flex-col gap-1.5 pb-2 ${isExpanded ? 'px-4' : 'px-3'}`}>
           <div className="border-t border-gray-200 dark:border-[#2d2d2d] mb-2 pt-3"></div>
           
+          {/* YENİ REZERVASYON BUTONU (Sabit kırmızı kalma özelliği kaldırıldı) */}
           <button 
-            onClick={() => { onClose(); router.push('/new-reservation'); }} 
+            onClick={() => { onClose(); router.push('/calendar'); }} 
             title="Yeni Rezervasyon"
             className={`w-full border-2 py-2 rounded-lg flex justify-center items-center gap-2 font-bold text-sm mb-1 transition-all duration-300 ${
               isExpanded ? 'px-3' : 'px-0'
-            } ${pathname === '/new-reservation' ? 'bg-[#E4032C] text-white border-[#E4032C]' : 'text-[#E4032C] border-[#E4032C] bg-transparent hover:bg-[#E4032C] hover:text-white'}`}
+            } text-[#E4032C] border-[#E4032C] bg-transparent hover:bg-[#E4032C] hover:text-white active:bg-red-700 active:border-red-700`}
           >
             <span className="material-symbols-outlined text-[20px]">add</span>
             {isExpanded && <span className="whitespace-nowrap">Yeni Rezervasyon</span>}
@@ -105,7 +104,6 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
           </button>
         </div>
       </nav>
-
     </>
   );
 }

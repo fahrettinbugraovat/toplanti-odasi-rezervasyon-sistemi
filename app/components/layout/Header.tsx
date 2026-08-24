@@ -41,7 +41,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <>
-      <header className="bg-white dark:bg-[#1c1c1c] border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center h-[72px] px-4 md:px-6 shrink-0 w-full z-50 relative transition-colors duration-300">
+      <header className="bg-white dark:bg-[#1c1c1c] border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center h-[72px] px-4 md:px-6 shrink-0 w-full z-50 relative">
         
         <div className="flex items-center">
           <div className="hidden md:flex mr-5 items-center">
