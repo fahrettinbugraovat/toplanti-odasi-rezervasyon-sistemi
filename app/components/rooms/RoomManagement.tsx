@@ -1,45 +1,101 @@
 'use client';
+import { useState, useMemo } from 'react';
+import { useReservationData } from '@/app/context/ReservationContext'; // Yol hatası alırsan '../../context/ReservationContext' yapabilirsin.
 
-import { useMemo, useState } from 'react';
-import { useReservationData } from '../../context/ReservationContext';
-
-function RoomManagement() {
+export default function RoomsPage() {
   const { rooms } = useReservationData();
-  const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // Sadece isme göre arama işlevi bırakıldı
   const filteredRooms = useMemo(
-    () => rooms.filter((room) => room.name.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'))),
-    [rooms, search],
+    () => rooms.filter((room: any) => 
+      room.name.toLocaleLowerCase('tr-TR').includes(searchQuery.toLocaleLowerCase('tr-TR'))
+    ),
+    [rooms, searchQuery]
   );
 
   return (
-    <section className="h-full overflow-y-auto bg-[#f3f6ff] px-4 py-7 text-[#101b35] dark:bg-[#141414] dark:text-white md:px-9 md:py-9 lg:px-10">
-      <div className="mx-auto max-w-[1080px]">
-        <header className="mb-11">
-          <h1 className="text-2xl font-bold tracking-tight md:text-[25px]">Toplantı Oda Bilgi Sistemi</h1>
-          <p className="mt-1 text-xs text-[#506079] dark:text-gray-400 md:text-sm">Sistemdeki tüm odaları ve aktif rezervasyonları yönetin.</p>
-        </header>
+    <div className="w-full flex flex-col h-full overflow-hidden pb-8">
+      
+      {/* ÜST BAŞLIK */}
+      <div className="mb-6 shrink-0">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Toplantı Odaları</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm md:text-base">Sistemdeki tüm toplantı odalarını ve özelliklerini buradan inceleyebilirsiniz.</p>
+      </div>
 
-        <div className="mt-[18px] flex items-center gap-4 bg-white/35 p-3 dark:bg-[#1c1c1c]">
-          <label className="flex h-9 max-w-[319px] flex-1 items-center gap-3 bg-white px-3 text-[#506079] dark:bg-[#222] dark:text-gray-400">
-            <span className="material-symbols-outlined text-[20px]">search</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Oda Ara..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#667085]" />
-          </label>
+      {/* LİSTE BÖLÜMÜ (Sadece Okunabilir) */}
+      <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#333] rounded-lg shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
+        
+        {/* ARAMA ÇUBUĞU */}
+        <div className="p-4 md:p-5 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#212121]">
+          <div className="relative w-full sm:w-80">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">search</span>
+            <input
+              type="text"
+              placeholder="Oda Ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded-lg bg-white dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C] transition-colors"
+            />
+          </div>
         </div>
 
-        <div className="mt-[18px] overflow-x-auto bg-white dark:bg-[#1c1c1c]">
-          <table className="w-full min-w-[650px] border-collapse text-left">
-            <thead><tr className="h-11 bg-[#f1f4fc] text-xs uppercase tracking-wide text-[#33415d] dark:bg-[#222] dark:text-gray-400"><th className="px-[18px] font-medium">Oda Adı</th><th className="px-4 font-medium">Kapasite</th><th className="px-4 font-medium">Özellikler</th><th className="px-4 font-medium">Durum</th></tr></thead>
-            <tbody>
-              {filteredRooms.map((room) => <tr key={room.id} className="h-[58px] text-sm"><td className="px-[18px] font-bold">{room.name}</td><td className="px-4">{room.capacity}</td><td className="px-4"><div className="flex gap-1">{room.features.map((feature) => <span key={feature} className="bg-[#e8eefb] px-2 py-1 text-xs dark:bg-[#30343d]">{feature}</span>)}</div></td><td className={`px-4 font-bold ${room.status === 'Dolu' ? 'text-[#ed002d]' : 'text-[#16a34a] dark:text-[#4ade80]'}`}>{room.status}</td></tr>)}
-              {filteredRooms.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-xs text-gray-500">Oda bulunamadı.</td></tr>}
+        {/* TABLO (İşlemler ve Rezervasyon Yönetimi Yok) */}
+        <div className="overflow-auto flex-1 p-4 md:p-5">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333]">
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider">Oda Adı</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider">Kapasite</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider">Donanımlar</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider">Mevcut Durum</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700 dark:text-gray-200 divide-y divide-gray-100 dark:divide-[#2d2d2d]">
+              {filteredRooms.map((room: any) => (
+                <tr key={room.id} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors">
+                  
+                  {/* ODA ADI */}
+                  <td className="px-4 py-4 font-bold text-sm text-gray-900 dark:text-white">{room.name}</td>
+                  
+                  {/* KAPASİTE */}
+                  <td className="px-4 py-4 text-sm">{room.capacity}</td>
+                  
+                  {/* ÖZELLİKLER */}
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {room.features.map((feature: string) => (
+                        <span key={feature} className="px-2 py-1 bg-gray-100 dark:bg-[#333] rounded text-xs text-gray-700 dark:text-gray-300 font-medium">
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  
+                  {/* DURUM (Müsait, Dolu vb.) */}
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex items-center gap-1.5 font-semibold text-sm ${room.status === 'Müsait' ? 'text-emerald-600 dark:text-emerald-500' : room.status === 'Dolu' ? 'text-red-600 dark:text-red-500' : 'text-amber-500 dark:text-amber-400'}`}>
+                      <span className={`w-2.5 h-2.5 rounded-full ${room.status === 'Müsait' ? 'bg-emerald-500' : room.status === 'Dolu' ? 'bg-red-600' : 'bg-amber-500'}`}></span>
+                      {room.status}
+                    </span>
+                  </td>
+                  
+                </tr>
+              ))}
+              
+              {/* ODA BULUNAMAMA DURUMU */}
+              {filteredRooms.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <span className="material-symbols-outlined text-4xl mb-2 opacity-50 block">search_off</span>
+                    <p className="text-sm font-semibold">Aradığınız kriterlere uygun oda bulunamadı.</p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
-
-export default RoomManagement;
-

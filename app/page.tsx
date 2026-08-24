@@ -29,7 +29,7 @@ export default function Home() {
     const duration = 2000; const frameRate = 1000 / 60; const totalFrames = Math.round(duration / frameRate); let frame = 0;
     const counterTimer = setInterval(() => {
       frame++; const ease = 1 - Math.pow(1 - (frame / totalFrames), 4);
-      setStats({ rooms: Math.round(24 * ease), reservations: Math.round(targetReservations * ease), usage: Math.round(targetUsage * ease) });
+      setStats({ rooms: Math.round(3 * ease), reservations: Math.round(targetReservations * ease), usage: Math.round(targetUsage * ease) });
       if (frame >= totalFrames) { clearInterval(counterTimer); setIsAnimating(false); }
     }, frameRate);
     return () => { clearTimeout(barTimer); clearInterval(counterTimer); };
@@ -172,7 +172,6 @@ export default function Home() {
             </div>
             <div className="p-2.5 bg-gray-50 dark:bg-[#2a2a2a] rounded text-[#E4032C]"><span className="material-symbols-outlined text-[24px]">domain</span></div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">Tüm lokasyonlardaki aktif odalar</p>
         </div>
         
         <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg p-4 md:p-5 flex flex-col justify-between transition-colors shadow-sm dark:shadow-none">
@@ -203,7 +202,7 @@ export default function Home() {
         <div className="xl:col-span-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg overflow-hidden flex flex-col min-h-[350px] xl:min-h-0 h-full shadow-sm dark:shadow-none">
           <div className="px-5 py-4 border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center bg-gray-50 dark:bg-[#212121] shrink-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Anlık Oda Durumu</h2>
-            <button className="text-sm font-bold text-[#E4032C] hover:text-red-500">Tümünü Gör</button>
+            
           </div>
           <div className="overflow-auto flex-1 min-h-0 relative">
             <table className="w-full text-left border-collapse min-w-[650px] xl:min-w-full">

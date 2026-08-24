@@ -30,7 +30,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     switch (pathname) {
       case '/': return 'Panel Özeti';
       case '/rooms': return 'Toplantı Odaları';
-      case '/calendar': return 'Takvim';
+      case '/calendar': return 'Rezervasyon';
       case '/my-meetings': return 'Toplantılarım';
       case '/new-reservation': return 'Yeni Rezervasyon';
       case '/profile-settings': return 'Profil Ayarları';

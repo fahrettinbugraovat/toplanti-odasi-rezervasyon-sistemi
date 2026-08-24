@@ -94,9 +94,7 @@ export default function MyMeetingsPage() {
         <button onClick={() => setActiveTab('gelecek')} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'gelecek' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
           Gelecek {activeTab === 'gelecek' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E4032C]"></div>}
         </button>
-        <button onClick={() => setActiveTab('gecmis')} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'gecmis' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
-          Geçmiş {activeTab === 'gecmis' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E4032C]"></div>}
-        </button>
+       
         <button onClick={() => setActiveTab('iptal')} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'iptal' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
           İptal Edilenler {activeTab === 'iptal' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E4032C]"></div>}
         </button>
