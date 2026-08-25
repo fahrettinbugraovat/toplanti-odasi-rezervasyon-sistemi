@@ -202,7 +202,6 @@ export default function CalendarView() {
             </div>
             <div className="ml-auto flex gap-3">
               <button onClick={() => { clearSelection(); setSelectedDate(new Date()); }} className="border border-[#E4032C] rounded px-4 py-1.5 text-xs font-bold text-[#E4032C] transition-colors hover:bg-[#E4032C] hover:text-white">Bugün</button>
-              <button className="border border-gray-300 rounded px-4 py-1.5 text-xs font-semibold text-gray-700 bg-white dark:bg-[#141414] dark:border-[#3d3d3d] dark:text-gray-300">Tüm Odalar ⌄</button>
             </div>
           </div>
 
