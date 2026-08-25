@@ -1,15 +1,22 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useReservationData } from './context/ReservationContext';
+import { useToast } from './context/ToastContext'; 
 
 const TIME_SLOTS = ["09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00"];
 
 export default function Home() {
   const { rooms, setRooms, operations, setOperations } = useReservationData();
-  const targetReservations = 142 + Math.max(0, operations.length - 4);
-  const targetUsage = Math.min(100, 78 + Math.max(0, operations.length - 4));
+  const { showToast } = useToast(); 
+
+  // --- DİNAMİK HESAPLAMA (Single Source of Truth) ---
+  const activeOperations = operations.filter((op: any) => op.status !== 'iptal');
+  const totalReservations = activeOperations.length;
+  
+  const totalSlots = rooms.length * TIME_SLOTS.length;
+  const usageRate = totalSlots > 0 ? Math.min(100, Math.round((totalReservations / totalSlots) * 100)) : 0;
+
   const [isMounted, setIsMounted] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState({ rooms: 0, reservations: 0, usage: 0 });
   const [isAnimating, setIsAnimating] = useState(true); 
   const [now, setNow] = useState<number | null>(null);
@@ -17,23 +24,70 @@ export default function Home() {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
+  const formatDateForList = (dateString: string) => {
+    if (!dateString) return "Belirsiz"; const d = new Date(dateString); if (isNaN(d.getTime())) return "Belirsiz";
+    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+    return `${d.getDate()} ${months[d.getMonth()]}`;
+  };
+
+  // 1. ANLIK ODA DURUMUNU LİSTEDEN DİNAMİK HESAPLAYAN MERKEZİ FONKSİYON
+  const isRoomCurrentlyOccupied = (roomName: string) => {
+    if (!now) return false;
+    const d = new Date(now);
+    const todayFormatted = formatDateForList(d.toISOString().split('T')[0]);
+    
+    const currentHour = d.getHours();
+    const currentMinute = d.getMinutes();
+    const currentTimeNum = currentHour + currentMinute / 60;
+
+    return activeOperations.some((op: any) => {
+      // Sadece bugünün rezervasyonlarını kontrol et (Sahte veri için 'Bugün' stringi de dahil)
+      if (op.date !== 'Bugün' && op.date !== todayFormatted) return false;
+      
+      const [opRoom, opTime] = (op.details || '').split(' • ');
+      if (opRoom !== roomName) return false;
+      if (!opTime) return false;
+
+      const [start, end] = opTime.split(' - ');
+      if (!start || !end) return false;
+      
+      const startNum = parseInt(start.split(':')[0], 10) + parseInt(start.split(':')[1], 10) / 60;
+      const endNum = parseInt(end.split(':')[0], 10) + parseInt(end.split(':')[1], 10) / 60;
+
+      // İçinde bulunduğumuz saat aralığında mı?
+      return currentTimeNum >= startNum && currentTimeNum < endNum;
+    });
+  };
+
   useEffect(() => {
     setIsMounted(true);
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const barTimer = setTimeout(() => setProgress(targetUsage), 100);
-    const duration = 2000; const frameRate = 1000 / 60; const totalFrames = Math.round(duration / frameRate); let frame = 0;
+    
+    const duration = 1500; 
+    const frameRate = 1000 / 60; 
+    const totalFrames = Math.round(duration / frameRate); 
+    let frame = 0;
+    
     const counterTimer = setInterval(() => {
-      frame++; const ease = 1 - Math.pow(1 - (frame / totalFrames), 4);
-      setStats({ rooms: Math.round(3 * ease), reservations: Math.round(targetReservations * ease), usage: Math.round(targetUsage * ease) });
-      if (frame >= totalFrames) { clearInterval(counterTimer); setIsAnimating(false); }
+      frame++; 
+      const ease = 1 - Math.pow(1 - (frame / totalFrames), 4);
+      setStats({ 
+        rooms: Math.round(rooms.length * ease), 
+        reservations: Math.round(totalReservations * ease), 
+        usage: Math.round(usageRate * ease) 
+      });
+      if (frame >= totalFrames) { 
+        clearInterval(counterTimer); 
+        setIsAnimating(false); 
+      }
     }, frameRate);
-    return () => { clearTimeout(barTimer); clearInterval(counterTimer); };
-  }, [targetReservations, targetUsage]);
+    
+    return () => { 
+      clearInterval(timer); 
+      clearInterval(counterTimer); 
+    };
+  }, []);
 
   const [deletingOp, setDeletingOp] = useState<any>(null);
   const [editingOp, setEditingOp] = useState<any>(null);
@@ -42,6 +96,7 @@ export default function Home() {
   const [resForm, setResForm] = useState({ title: '', time: '', date: '' });
   const [originalTime, setOriginalTime] = useState("");
 
+  // Rezerve ediliyor kilidini zamanı gelince kaldıran useEffect (Statik Dolu yapmıyor)
   useEffect(() => {
     if (!now) return;
     setRooms((prevRooms: any[]) => {
@@ -79,22 +134,26 @@ export default function Home() {
     return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, [reservingRoomId]);
 
-  const formatDateForList = (dateString: string) => {
-    if (!dateString) return "Belirsiz"; const d = new Date(dateString); if (isNaN(d.getTime())) return "Belirsiz";
-    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-    return `${d.getDate()} ${months[d.getMonth()]}`;
-  };
-
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingOp) return;
-    setOperations(operations.map((op: any) => op.id === editingOp.id ? { ...op, title: editForm.title, details: `${editForm.room} • ${editForm.time}`, date: formatDateForList(editForm.date) } : op));
-    setEditingOp(null);
+    try {
+      setOperations(operations.map((op: any) => op.id === editingOp.id ? { ...op, title: editForm.title, details: `${editForm.room} • ${editForm.time}`, date: formatDateForList(editForm.date) } : op));
+      setEditingOp(null);
+      showToast({ type: 'success', title: 'Rezervasyon Güncellendi', message: 'Rezervasyon bilgileri başarıyla güncellendi.' });
+    } catch (error) {
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'İşlem gerçekleştirilemedi. Lütfen tekrar deneyin.' });
+    }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingOp) return;
-    setOperations(operations.filter((op: any) => op.id !== deletingOp.id));
-    setDeletingOp(null);
+    try {
+      setOperations(operations.filter((op: any) => op.id !== deletingOp.id));
+      setDeletingOp(null);
+      showToast({ type: 'success', title: 'Rezervasyon Silindi', message: 'Rezervasyon başarıyla silindi.' });
+    } catch (error) {
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'İşlem gerçekleştirilemedi. Lütfen tekrar deneyin.' });
+    }
   };
 
   const handleStartReservation = (roomId: string) => {
@@ -111,15 +170,25 @@ export default function Home() {
     setReservingRoomId(null);
   };
 
-  const handleConfirmReservation = () => {
+  const handleConfirmReservation = async () => {
     if (!reservingRoomId) return;
-    const reservedRoom = rooms.find((r: any) => r.id === reservingRoomId);
-    setRooms((prev: any[]) => prev.map((r: any) => r.id === reservingRoomId ? { ...r, status: 'Dolu', lockEndTime: null } : r));
-    if (reservedRoom) {
-      setOperations([{ id: Date.now(), title: resForm.title || 'Yeni Toplantı', details: `${reservedRoom.name} • ${resForm.time}`, date: formatDateForList(resForm.date) }, ...operations]);
+    try {
+      const reservedRoom = rooms.find((r: any) => r.id === reservingRoomId);
+      
+      // 2. YALNIZCA KİLİDİ KALDIRIYORUZ, MANUEL OLARAK 'Dolu' YAPMIYORUZ (Dinamik fonksiyon halledecek)
+      setRooms((prev: any[]) => prev.map((r: any) => r.id === reservingRoomId ? { ...r, status: 'Müsait', lockEndTime: null } : r));
+      
+      if (reservedRoom) {
+        setOperations([{ id: Date.now(), title: resForm.title || 'Yeni Toplantı', details: `${reservedRoom.name} • ${resForm.time}`, date: formatDateForList(resForm.date) }, ...operations]);
+      }
+      
+      setLockedSlots((prev: any) => { const newLocks = {...prev}; delete newLocks[reservingRoomId]; return newLocks; });
+      setReservingRoomId(null);
+      
+      showToast({ type: 'success', title: 'Rezervasyon Tamamlandı', message: 'Rezervasyon başarıyla oluşturuldu.' });
+    } catch (error) {
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'İşlem gerçekleştirilemedi. Lütfen tekrar deneyin.' });
     }
-    setLockedSlots((prev: any) => { const newLocks = {...prev}; delete newLocks[reservingRoomId]; return newLocks; });
-    setReservingRoomId(null);
   };
 
   const handleSelectTime = (slot: string) => {
@@ -127,30 +196,25 @@ export default function Home() {
     if (reservingRoomId) setLockedSlots((prev: any) => ({ ...prev, [reservingRoomId]: slot }));
   };
 
+  // Dinamik statülere göre butonları pasif/aktif etme
   const getSlotStatusesForDate = (dateStr: string) => {
     if (!dateStr) return { occupied: [], reserving: [] };
-    let hash = 0; for (let i = 0; i < dateStr.length; i++) hash += dateStr.charCodeAt(i);
-    const occupied: string[] = []; const reserving: string[] = [];
-    if (hash % 2 === 0) occupied.push("10:00 - 11:00");
-    if (hash % 3 === 0) occupied.push("13:00 - 14:00");
-    if (hash % 4 === 0) occupied.push("15:00 - 16:00");
-    if (!occupied.includes("11:00 - 12:00")) reserving.push("11:00 - 12:00");
-    else if (!occupied.includes("09:00 - 10:00")) reserving.push("09:00 - 10:00");
+    const formattedDate = formatDateForList(dateStr);
+    const occupied: string[] = []; 
+    const reserving: string[] = [];
+
+    activeOperations.forEach((op: any) => {
+      if (op.date === formattedDate || op.date === 'Bugün') {
+        const [opRoom, opTime] = (op.details || '').split(' • ');
+        if (opTime) occupied.push(opTime);
+      }
+    });
+
     return { occupied, reserving };
   };
 
   const slotStatusesEdit = getSlotStatusesForDate(editForm.date);
   const slotStatusesRes = getSlotStatusesForDate(resForm.date);
-
-  const isCurrentSlot = (slot: string | null) => {
-    if (!slot) return true; 
-    const [start, end] = slot.split(' - ');
-    const d = new Date();
-    const currentTime = d.getHours() + d.getMinutes() / 60;
-    const startHourNum = parseInt(start.split(':')[0], 10) + parseInt(start.split(':')[1], 10) / 60;
-    const endHourNum = parseInt(end.split(':')[0], 10) + parseInt(end.split(':')[1], 10) / 60;
-    return currentTime >= startHourNum && currentTime < endHourNum;
-  };
 
   const formatTimeLeft = (endTime: number | null) => {
     if (!endTime || !now) return "00:00";
@@ -168,7 +232,7 @@ export default function Home() {
           <div className="flex justify-between items-start mb-1">
             <div>
               <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Toplam Oda</p>
-              <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">{isAnimating ? stats.rooms : 3}</h3>
+              <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">{isAnimating ? stats.rooms : rooms.length}</h3>
             </div>
             <div className="p-2.5 bg-gray-50 dark:bg-[#2a2a2a] rounded text-[#E4032C]"><span className="material-symbols-outlined text-[24px]">domain</span></div>
           </div>
@@ -178,7 +242,7 @@ export default function Home() {
           <div className="flex justify-between items-start mb-1">
             <div>
               <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aktif Rezervasyonlar</p>
-              <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">{isAnimating ? stats.reservations : targetReservations}</h3>
+              <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">{isAnimating ? stats.reservations : totalReservations}</h3>
             </div>
             <div className="p-2.5 bg-gray-50 dark:bg-[#2a2a2a] rounded text-[#E4032C]"><span className="material-symbols-outlined text-[24px]">event</span></div>
           </div>
@@ -188,12 +252,12 @@ export default function Home() {
           <div className="flex justify-between items-start mb-1">
             <div>
               <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kullanım Oranı</p>
-              <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">%{isAnimating ? stats.usage : targetUsage}</h3>
+              <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">%{isAnimating ? stats.usage : usageRate}</h3>
             </div>
             <div className="p-2.5 bg-gray-50 dark:bg-[#2a2a2a] rounded text-[#E4032C]"><span className="material-symbols-outlined text-[24px]">trending_up</span></div>
           </div>
           <div className="w-full bg-gray-200 dark:bg-[#2a2a2a] rounded-full h-1.5 mt-6 overflow-hidden">
-            <div className="bg-[#E4032C] h-1.5 rounded-full transition-all duration-[2000ms] ease-out" style={{ width: `${isAnimating ? progress : targetUsage}%` }}></div>
+            <div className="bg-[#E4032C] h-1.5 rounded-full transition-all duration-700 ease-out" style={{ width: `${isAnimating ? stats.usage : usageRate}%` }}></div>
           </div>
         </div>
       </div>
@@ -202,7 +266,6 @@ export default function Home() {
         <div className="xl:col-span-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg overflow-hidden flex flex-col min-h-[350px] xl:min-h-0 h-full shadow-sm dark:shadow-none">
           <div className="px-5 py-4 border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center bg-gray-50 dark:bg-[#212121] shrink-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Anlık Oda Durumu</h2>
-            
           </div>
           <div className="overflow-auto flex-1 min-h-0 relative">
             <table className="w-full text-left border-collapse min-w-[650px] xl:min-w-full">
@@ -216,11 +279,19 @@ export default function Home() {
               </thead>
               <tbody className="text-gray-700 dark:text-gray-200">
                 {rooms.map((room: any) => {
-                  const lockedSlot = lockedSlots[room.id] || null;
-                  let displayStatus = room.status;
-                  if (displayStatus === 'Rezerve Ediliyor' && !isCurrentSlot(lockedSlot)) displayStatus = 'Müsait';
+                  
+                  // 3. STATÜNÜN DİNAMİK OLARAK BELİRLENDİĞİ YER
+                  let displayStatus = 'Müsait';
+                  
+                  if (room.status === 'Rezerve Ediliyor' && room.lockEndTime && now && now < room.lockEndTime) {
+                    displayStatus = 'Rezerve Ediliyor'; // UI kilitlenmesi devam ediyorsa
+                  } else if (isRoomCurrentlyOccupied(room.name)) {
+                    displayStatus = 'Dolu'; // Şu anda aktif bir randevu varsa
+                  }
+
                   const isAvailable = displayStatus === 'Müsait';
                   const isOccupied = displayStatus === 'Dolu';
+                  
                   return (
                     <tr key={room.id} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] group">
                       <td className="px-4 py-3 md:px-5 md:py-4 font-semibold text-sm md:text-base border border-gray-200 dark:border-[#2d2d2d]">{room.name}</td>
@@ -250,13 +321,13 @@ export default function Home() {
         <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg flex flex-col min-h-[350px] xl:min-h-0 h-full shadow-sm dark:shadow-none">
           <div className="px-5 py-4 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] flex justify-between items-center shrink-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Son İşlemler</h2>
-            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#2a2a2a] px-2 py-0.5 rounded-full">{operations.length} İşlem</span>
+            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#2a2a2a] px-2 py-0.5 rounded-full">{totalReservations} İşlem</span>
           </div>
           <div className="flex-1 p-4 md:p-5 space-y-3.5 overflow-y-auto min-h-0">
-            {operations.length === 0 ? (
+            {activeOperations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 space-y-2 pt-8"><span className="material-symbols-outlined text-4xl opacity-50">event_busy</span><p className="text-xs font-semibold">Yaklaşan işlem bulunmuyor</p></div>
             ) : (
-              operations.map((op: any) => (
+              activeOperations.map((op: any) => (
                 <div key={op.id} className="flex flex-col gap-2 p-3 md:p-4 bg-white dark:bg-[#1c1c1c] rounded-lg border border-gray-200 dark:border-[#3d3d3d] hover:border-gray-300 dark:hover:border-[#4d4d4d] transition-colors">
                   <div className="flex justify-between items-start">
                     <div><p className="font-bold text-sm text-gray-900 dark:text-white">{op.title}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{op.details}</p></div>
@@ -290,7 +361,6 @@ export default function Home() {
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Tarih</label>
-                {/* DARK MODE TAKVİM DÜZELTMESİ: [color-scheme:light] dark:[color-scheme:dark] EKLENDİ */}
                 <input 
                   type="date" 
                   min={todayStr} 
@@ -303,7 +373,10 @@ export default function Home() {
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Saat Aralığı</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {TIME_SLOTS.map(slot => {
-                    const isSelected = resForm.time === slot; const isOccupied = slotStatusesRes.occupied.includes(slot); const isReserving = slotStatusesRes.reserving.includes(slot); const isDisabled = isOccupied || isReserving;
+                    const isSelected = resForm.time === slot; 
+                    const isOccupied = slotStatusesRes.occupied.includes(slot); 
+                    const isReserving = slotStatusesRes.reserving.includes(slot); 
+                    const isDisabled = isOccupied || isReserving;
                     return (
                       <button key={slot} disabled={isDisabled} onClick={() => handleSelectTime(slot)} className={`p-3 rounded border text-base font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${isSelected ? 'bg-[#E4032C] border-[#E4032C] text-white' : isOccupied ? 'bg-gray-100 dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333] text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60' : isReserving ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/40 text-amber-600 dark:text-amber-500 cursor-not-allowed opacity-80' : 'bg-white dark:bg-[#1c1c1c] border-gray-300 dark:border-[#3d3d3d] text-gray-700 dark:text-gray-300 hover:border-[#E4032C] hover:text-[#E4032C]'}`}>
                         <span>{slot}</span><span className={`text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-white' : isOccupied ? 'text-gray-400 dark:text-gray-600' : isReserving ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>{isOccupied ? 'Dolu' : isReserving ? 'İşlemde' : isSelected ? 'Seçildi' : 'Boş'}</span>
@@ -329,7 +402,6 @@ export default function Home() {
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Tarih</label>
-                {/* DARK MODE TAKVİM DÜZELTMESİ: [color-scheme:light] dark:[color-scheme:dark] EKLENDİ */}
                 <input 
                   type="date" 
                   min={todayStr} 
@@ -342,7 +414,10 @@ export default function Home() {
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Saat Aralığı</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {TIME_SLOTS.map(slot => {
-                    const isSelected = editForm.time === slot; const isOccupied = slotStatusesEdit.occupied.includes(slot) && slot !== originalTime; const isReserving = slotStatusesEdit.reserving.includes(slot) && slot !== originalTime; const isDisabled = isOccupied || isReserving;
+                    const isSelected = editForm.time === slot; 
+                    const isOccupied = slotStatusesEdit.occupied.includes(slot) && slot !== originalTime; 
+                    const isReserving = slotStatusesEdit.reserving.includes(slot) && slot !== originalTime; 
+                    const isDisabled = isOccupied || isReserving;
                     return (
                       <button key={slot} disabled={isDisabled} onClick={() => setEditForm({...editForm, time: slot})} className={`p-3 rounded border text-base font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${isSelected ? 'bg-[#E4032C] border-[#E4032C] text-white' : isOccupied ? 'bg-gray-100 dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333] text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60' : isReserving ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/40 text-amber-600 dark:text-amber-500 cursor-not-allowed opacity-80' : 'bg-white dark:bg-[#1c1c1c] border-gray-300 dark:border-[#3d3d3d] text-gray-700 dark:text-gray-300 hover:border-[#E4032C] hover:text-[#E4032C]'}`}>
                         <span>{slot}</span><span className={`text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-white' : isOccupied ? 'text-gray-400 dark:text-gray-600' : isReserving ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>{isOccupied ? 'Dolu' : isReserving ? 'İşlemde' : isSelected ? 'Seçildi' : 'Boş'}</span>

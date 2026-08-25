@@ -1,13 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useReservationData } from '../context/ReservationContext';
-import { useTheme } from '../context/ThemeContext'; // TEMAYI ZORLA OKUMAK İÇİN EKLENDİ
+import { useTheme } from '../context/ThemeContext'; 
+import { useToast } from '../context/ToastContext'; // TOAST SİSTEMİ EKLENDİ
 
 const TIME_SLOTS = ["09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00"];
 
 export default function MyMeetingsPage() {
   const { rooms, operations, setOperations } = useReservationData();
-  const { theme } = useTheme(); // MEVCUT TEMAYI ÇEKİYORUZ
+  const { theme } = useTheme(); 
+  const { showToast } = useToast(); // TOAST FONKSİYONU ÇAĞRILDI
   const [activeTab, setActiveTab] = useState<'gelecek' | 'gecmis' | 'iptal'>('gelecek');
 
   const [editingOp, setEditingOp] = useState<any>(null);
@@ -45,20 +47,50 @@ export default function MyMeetingsPage() {
     return `${d.getDate()} ${months[d.getMonth()]}`;
   };
 
-  const handleSaveEdit = () => {
+  // 1. DÜZENLEME İŞLEMİ TOAST ENTEGRASYONU
+  const handleSaveEdit = async () => {
     if (!editingOp) return;
-    setOperations(operations.map((op: any) => 
-      op.id === editingOp.id 
-        ? { ...op, title: editForm.title, details: `${editForm.room} • ${editForm.time}`, date: formatDateForList(editForm.date) } 
-        : op
-    ));
-    setEditingOp(null);
+    try {
+      setOperations(operations.map((op: any) => 
+        op.id === editingOp.id 
+          ? { ...op, title: editForm.title, details: `${editForm.room} • ${editForm.time}`, date: formatDateForList(editForm.date) } 
+          : op
+      ));
+      setEditingOp(null);
+      
+      showToast({
+        type: 'success',
+        title: 'Rezervasyon Güncellendi',
+        message: 'Rezervasyon bilgileriniz başarıyla güncellendi.'
+      });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'İşlem Başarısız',
+        message: 'Rezervasyon işlemi gerçekleştirilemedi. Lütfen tekrar deneyin.'
+      });
+    }
   };
 
-  const handleCancel = (id: number) => {
-    setOperations(operations.map((op: any) => 
-      op.id === id ? { ...op, status: 'iptal' } : op
-    ));
+  // 2. İPTAL ETME (SİLME) İŞLEMİ TOAST ENTEGRASYONU
+  const handleCancel = async (id: number) => {
+    try {
+      setOperations(operations.map((op: any) => 
+        op.id === id ? { ...op, status: 'iptal' } : op
+      ));
+      
+      showToast({
+        type: 'success',
+        title: 'Rezervasyon Silindi',
+        message: 'Rezervasyon başarıyla silindi.'
+      });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'İşlem Başarısız',
+        message: 'Rezervasyon işlemi gerçekleştirilemedi. Lütfen tekrar deneyin.'
+      });
+    }
   };
 
   const getSlotStatusesForDate = (dateStr: string) => {
@@ -197,7 +229,6 @@ export default function MyMeetingsPage() {
               
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Tarih</label>
-                {/* TARAYICIYI ZORLAYAN STİL EKLENDİ (style={{ colorScheme }}) */}
                 <input 
                   type="date" 
                   min={todayStr}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Room, useReservationData } from '../../context/ReservationContext';
+import { useToast } from '../../context/ToastContext'; // TOAST SİSTEMİ EKLENDİ
 
 const timeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 interface SelectedSlot {
@@ -13,6 +14,8 @@ interface SelectedSlot {
 export default function CalendarView() {
   const { theme } = useTheme();
   const { rooms, reservations, setReservations, setRooms, operations, setOperations, pendingSelection, setPendingSelection, pendingTitle, setPendingTitle } = useReservationData();
+  const { showToast } = useToast(); // TOAST FONKSİYONU ÇAĞRILDI
+  
   const selectedRoom = pendingSelection ? rooms.find((room) => room.id === pendingSelection.roomId) : null;
   const selectedSlot = selectedRoom && pendingSelection ? { room: selectedRoom, slots: pendingSelection.slots } : null;
   const reservationTitle = pendingTitle;
@@ -102,32 +105,54 @@ export default function CalendarView() {
     return ranges;
   };
 
-  const confirmReservation = () => {
+  // TOAST ENTEGRASYONU YAPILAN YER (try/catch eklendi)
+  const confirmReservation = async () => {
     if (!selectedSlot?.room || !selectedDate || !pendingSelection || !reservationTitle.trim()) return;
-    const sortedSlots = [...selectedSlot.slots].sort((first, second) => first - second);
-    const ranges: { start: number; end: number }[] = [];
-    let rangeStart = sortedSlots[0];
-    let rangeEnd = sortedSlots[0];
+    
+    try {
+      const sortedSlots = [...selectedSlot.slots].sort((first, second) => first - second);
+      const ranges: { start: number; end: number }[] = [];
+      let rangeStart = sortedSlots[0];
+      let rangeEnd = sortedSlots[0];
 
-    sortedSlots.slice(1).forEach((slot) => {
-      if (slot === rangeEnd + 1) {
-        rangeEnd = slot;
-      } else {
-        ranges.push({ start: rangeStart, end: rangeEnd + 1 });
-        rangeStart = slot;
-        rangeEnd = slot;
-      }
-    });
-    ranges.push({ start: rangeStart, end: rangeEnd + 1 });
+      sortedSlots.slice(1).forEach((slot) => {
+        if (slot === rangeEnd + 1) {
+          rangeEnd = slot;
+        } else {
+          ranges.push({ start: rangeStart, end: rangeEnd + 1 });
+          rangeStart = slot;
+          rangeEnd = slot;
+        }
+      });
+      ranges.push({ start: rangeStart, end: rangeEnd + 1 });
 
-    setReservations([...reservations, ...ranges.map((range) => ({ id: Date.now() + range.start, roomId: selectedSlot.room!.id, ...range, title: reservationTitle.trim(), date: pendingSelection.date }))]);
-    const isCurrentReservation = isToday && selectedSlot.slots.some((slot) => slot === currentTime!.getHours() - 9);
-    setRooms((currentRooms) => currentRooms.map((room) => room.id === selectedSlot.room.id
-      ? { ...room, status: isCurrentReservation ? 'Dolu' : room.status === 'Rezerve Ediliyor' ? 'Müsait' : room.status, lockEndTime: null }
-      : room));
-    setOperations([{ id: Date.now(), title: reservationTitle.trim(), details: `${selectedSlot.room.name} • ${formatSelectedRanges(selectedSlot.slots).join(', ')}`, date: formatDate(selectedDate) }, ...operations]);
-    setPendingTitle('');
-    setPendingSelection(null);
+      setReservations([...reservations, ...ranges.map((range) => ({ id: Date.now() + range.start, roomId: selectedSlot.room!.id, ...range, title: reservationTitle.trim(), date: pendingSelection.date }))]);
+      const isCurrentReservation = isToday && selectedSlot.slots.some((slot) => slot === currentTime!.getHours() - 9);
+      
+      setRooms((currentRooms) => currentRooms.map((room) => room.id === selectedSlot.room.id
+        ? { ...room, status: isCurrentReservation ? 'Dolu' : room.status === 'Rezerve Ediliyor' ? 'Müsait' : room.status, lockEndTime: null }
+        : room));
+        
+      setOperations([{ id: Date.now(), title: reservationTitle.trim(), details: `${selectedSlot.room.name} • ${formatSelectedRanges(selectedSlot.slots).join(', ')}`, date: formatDate(selectedDate) }, ...operations]);
+      
+      setPendingTitle('');
+      setPendingSelection(null);
+
+      // BAŞARILI İŞLEM BİLDİRİMİ
+      showToast({
+        type: 'success',
+        title: 'Rezervasyon Tamamlandı',
+        message: 'Rezervasyonunuz başarıyla oluşturuldu.'
+      });
+      
+    } catch (error) {
+      // BAŞARISIZ İŞLEM BİLDİRİMİ
+      showToast({
+        type: 'error',
+        title: 'Rezervasyon Oluşturulamadı',
+        message: 'Rezervasyon oluşturulurken bir hata oluştu.'
+      });
+    }
   };
 
   const isSlotSelected = (roomName: string, slotIndex: number) => (
