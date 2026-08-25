@@ -3,8 +3,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface User {
   fullName: string;
+  username: string;
   email: string;
-  phone?: string;
+  phone: string;
   profilePhoto: string | null;
   role: string;
 }
@@ -13,7 +14,7 @@ interface UserContextType {
   user: User;
   updateProfilePhoto: (photo: string | null) => void;
   updateUserProfile: (data: Partial<User>) => void;
-  mounted: boolean; // Sayfa yüklenmeden önce fotoğraf titremesini engellemek için
+  mounted: boolean; 
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -22,13 +23,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<User>({
     fullName: 'Fahrettin Buğra OVAT',
+    username: 'fbovat',
     email: 'fahrettin.ovat@example.com',
     phone: '+90 555 123 45 67',
-    profilePhoto: null, // Başlangıçta fotoğraf yok
+    profilePhoto: null, 
     role: 'Admin',
   });
 
-  // Sayfa yüklendiğinde tarayıcı hafızasından (localStorage) kayıtlı profili çek
+  // Sayfa yüklendiğinde localStorage'dan çek
   useEffect(() => {
     const savedUser = localStorage.getItem('userProfile');
     if (savedUser) {
@@ -37,7 +39,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Fotoğrafı Güncelle ve Hafızaya Kaydet
   const updateProfilePhoto = (photo: string | null) => {
     setUser((prev) => {
       const updated = { ...prev, profilePhoto: photo };
@@ -46,7 +47,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // Profil Bilgilerini Güncelle ve Hafızaya Kaydet
   const updateUserProfile = (data: Partial<User>) => {
     setUser((prev) => {
       const updated = { ...prev, ...data };

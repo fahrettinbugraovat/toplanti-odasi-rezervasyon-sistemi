@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Room, useReservationData } from '../../context/ReservationContext';
-import { useToast } from '../../context/ToastContext'; // TOAST SİSTEMİ EKLENDİ
+import { useToast } from '../../context/ToastContext';
 
 const timeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 interface SelectedSlot {
@@ -14,7 +14,7 @@ interface SelectedSlot {
 export default function CalendarView() {
   const { theme } = useTheme();
   const { rooms, reservations, setReservations, setRooms, operations, setOperations, pendingSelection, setPendingSelection, pendingTitle, setPendingTitle } = useReservationData();
-  const { showToast } = useToast(); // TOAST FONKSİYONU ÇAĞRILDI
+  const { showToast } = useToast();
   
   const selectedRoom = pendingSelection ? rooms.find((room) => room.id === pendingSelection.roomId) : null;
   const selectedSlot = selectedRoom && pendingSelection ? { room: selectedRoom, slots: pendingSelection.slots } : null;
@@ -105,7 +105,6 @@ export default function CalendarView() {
     return ranges;
   };
 
-  // TOAST ENTEGRASYONU YAPILAN YER (try/catch eklendi)
   const confirmReservation = async () => {
     if (!selectedSlot?.room || !selectedDate || !pendingSelection || !reservationTitle.trim()) return;
     
@@ -138,7 +137,6 @@ export default function CalendarView() {
       setPendingTitle('');
       setPendingSelection(null);
 
-      // BAŞARILI İŞLEM BİLDİRİMİ
       showToast({
         type: 'success',
         title: 'Rezervasyon Tamamlandı',
@@ -146,7 +144,6 @@ export default function CalendarView() {
       });
       
     } catch (error) {
-      // BAŞARISIZ İŞLEM BİLDİRİMİ
       showToast({
         type: 'error',
         title: 'Rezervasyon Oluşturulamadı',
@@ -167,38 +164,136 @@ export default function CalendarView() {
 
   return (
     <section className="h-full overflow-y-auto bg-[#f3f6ff] p-4 text-[#101b35] dark:bg-[#141414] dark:text-[#e5e7eb] md:p-5">
-      <div className="mx-auto flex h-full max-w-[1100px] flex-col gap-4 xl:flex-row">
-        <div className="min-h-[520px] min-w-0 flex-1 border border-gray-200 bg-white dark:border-[#2d2d2d] dark:bg-[#1c1c1c]">
-          <div className="relative flex h-[53px] items-center justify-between border-b border-gray-200 bg-gray-100 px-4 dark:border-[#2d2d2d] dark:bg-[#212121]">
-            <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2"><button title="Önceki gün" onClick={() => changeDate(-1)} className="text-xl text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">‹</button><input type="date" aria-label="Takvim tarihi seç" min={currentTime.toISOString().split('T')[0]} value={selectedDate.toISOString().split('T')[0]} onChange={(event) => handleDateChange(event.target.value)} style={{ colorScheme: theme }} className="border border-gray-300 bg-white px-2 py-1.5 text-sm font-bold text-gray-900 outline-none focus:border-[#ed002d] dark:border-[#56595e] dark:bg-[#2a2a2a] dark:text-white" /><button title="Sonraki gün" onClick={() => changeDate(1)} className="text-xl text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">›</button></div>
-            <div className="ml-auto flex gap-2"><button onClick={() => { clearSelection(); setSelectedDate(new Date()); }} className="border border-[#ed002d] px-3 py-1.5 text-[10px] font-bold text-[#ed002d] transition-colors hover:bg-[#ed002d] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#ed002d] focus:ring-offset-1 focus:ring-offset-gray-100 dark:focus:ring-offset-[#212121]">Bugün</button><button className="border border-gray-300 px-3 py-1.5 text-[10px] text-gray-700 dark:border-[#56595e] dark:text-gray-200">Tüm Odalar⌄</button></div>
+      {/* pb-32 ile Floating Button çakışması önlendi, items-start ile gereksiz uzama engellendi */}
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-4 xl:flex-row items-start pb-32">
+        
+        {/* TAKVİM GRID ALANI (h-fit ile dinamik yükseklik) */}
+        <div className="w-full xl:flex-1 border border-gray-200 bg-white dark:border-[#2d2d2d] dark:bg-[#1c1c1c] rounded-lg shadow-sm overflow-hidden h-fit">
+          
+          {/* TAKVİM HEADER */}
+          <div className="relative flex h-14 items-center justify-between border-b border-gray-200 bg-gray-50 px-5 dark:border-[#2d2d2d] dark:bg-[#212121]">
+            <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3">
+              <button title="Önceki gün" onClick={() => changeDate(-1)} className="text-2xl text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">‹</button>
+              <input type="date" aria-label="Takvim tarihi seç" min={currentTime.toISOString().split('T')[0]} value={selectedDate.toISOString().split('T')[0]} onChange={(event) => handleDateChange(event.target.value)} style={{ colorScheme: theme }} className="border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-900 rounded outline-none focus:border-[#E4032C] dark:border-[#3d3d3d] dark:bg-[#141414] dark:text-white" />
+              <button title="Sonraki gün" onClick={() => changeDate(1)} className="text-2xl text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">›</button>
+            </div>
+            <div className="ml-auto flex gap-3">
+              <button onClick={() => { clearSelection(); setSelectedDate(new Date()); }} className="border border-[#E4032C] rounded px-4 py-1.5 text-xs font-bold text-[#E4032C] transition-colors hover:bg-[#E4032C] hover:text-white">Bugün</button>
+              <button className="border border-gray-300 rounded px-4 py-1.5 text-xs font-semibold text-gray-700 bg-white dark:bg-[#141414] dark:border-[#3d3d3d] dark:text-gray-300">Tüm Odalar ⌄</button>
+            </div>
           </div>
 
-          <div className="grid overflow-x-auto text-xs" style={{ gridTemplateColumns: `165px repeat(${visibleTimeSlots.length}, minmax(90px, 1fr))` }}>
-            <div className="h-11 border-b border-r border-gray-200 px-3 py-3.5 dark:border-[#2d2d2d]">Oda</div>
-            {visibleTimeSlots.map(({ time, slotIndex }) => <div key={time} className="h-11 border-b border-r border-gray-200 px-2 py-3.5 text-center dark:border-[#2d2d2d]">{time} - {timeSlots[slotIndex + 1] ?? '18:00'}</div>)}
-            {rooms.map((room) => <div key={room.id} className="contents">
-              <div className="h-[82px] border-b border-r border-gray-200 px-3 py-3 dark:border-[#2d2d2d]"><strong className="block text-sm">{room.name}</strong><span className="text-xs text-gray-500 dark:text-gray-300">{room.capacity}</span></div>
-              {visibleTimeSlots.map(({ time, slotIndex }) => {
-                const reservation = getReservation(room.id, slotIndex);
-                const isContinuation = reservations.some((item) => item.roomId === room.id && item.start < slotIndex && item.end > slotIndex);
-                if (isContinuation) return null;
-                if (reservation) return <div key={time} className="m-1 h-[74px] overflow-hidden border border-[#E4032C] bg-[#E4032C] px-2 text-left text-xs font-semibold text-white" style={{ gridColumn: `span ${reservation.end - reservation.start}` }}>{reservation.title}</div>;
-                const isSelected = isSlotSelected(room.name, slotIndex);
-                return <button key={time} onClick={() => selectEmptySlot(room, slotIndex)} className={`h-[82px] border-b border-r border-gray-200 text-[#ed002d] hover:bg-gray-50 dark:border-[#2d2d2d] dark:text-[#ff1744] dark:hover:bg-[#272a2e] ${isSelected ? 'bg-red-50 ring-1 ring-inset ring-[#ed002d] dark:bg-[#3a2026]' : ''}`} title={`${room.name} ${time} seç`}></button>;
-              })}
-            </div>)}
+          {/* DİNAMİK GRID TABLOSU */}
+          <div className="grid overflow-x-auto w-full" style={{ gridTemplateColumns: `180px repeat(${visibleTimeSlots.length}, minmax(110px, 1fr))` }}>
+            
+            {/* ÜST BİLGİ SATIRI (Oda ve Saatler) */}
+            <div className="h-12 border-b border-r border-gray-200 px-4 flex items-center font-bold text-xs text-gray-600 dark:text-gray-400 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#1a1a1a]">Oda</div>
+            {visibleTimeSlots.map(({ time, slotIndex }) => (
+              <div key={time} className="h-12 border-b border-r border-gray-200 px-2 flex items-center justify-center font-bold text-[11px] text-gray-600 dark:text-gray-400 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#1a1a1a]">
+                {time} - {timeSlots[slotIndex + 1] ?? '18:00'}
+              </div>
+            ))}
+
+            {/* DİNAMİK ODA SATIRLARI (Tamamen mevcut oda sayısına bağlıdır) */}
+            {rooms.map((room) => (
+              <div key={room.id} className="contents group">
+                
+                {/* SOL KOLON: ODA BİLGİSİ */}
+                <div className="h-[88px] border-b border-r border-gray-200 px-4 py-4 dark:border-[#2d2d2d] bg-white dark:bg-[#1c1c1c] flex flex-col justify-center transition-colors group-hover:bg-gray-50 dark:group-hover:bg-[#252525]">
+                  <strong className="block text-sm text-gray-900 dark:text-white truncate">{room.name}</strong>
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{room.capacity}</span>
+                </div>
+
+                {/* SAĞ KOLONLAR: SAAT DİLİMLERİ VE REZERVASYONLAR */}
+                {visibleTimeSlots.map(({ time, slotIndex }) => {
+                  const reservation = getReservation(room.id, slotIndex);
+                  
+                  // Eğer rezervasyon birden fazla saate sarkıyorsa (span), ara hücreleri gizle
+                  const isContinuation = reservations.some((item) => item.roomId === room.id && item.start < slotIndex && item.end > slotIndex);
+                  if (isContinuation) return null;
+
+                  // 1. DURUM: REZERVASYON VAR (Izgara kenarlıkları korunarak içine eklendi)
+                  if (reservation) {
+                    return (
+                      <div 
+                        key={time} 
+                        className="h-[88px] border-b border-r border-gray-200 dark:border-[#2d2d2d] bg-white dark:bg-[#1c1c1c] p-1.5" 
+                        style={{ gridColumn: `span ${reservation.end - reservation.start}` }}
+                      >
+                        <div className="h-full w-full overflow-hidden rounded bg-[#E4032C] px-3 py-2 text-left text-xs font-bold text-white shadow-sm flex items-start">
+                          {reservation.title}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // 2. DURUM: BOŞ VEYA SEÇİLİ HÜCRE
+                  const isSelected = isSlotSelected(room.name, slotIndex);
+                  return (
+                    <button 
+                      key={time} 
+                      onClick={() => selectEmptySlot(room, slotIndex)} 
+                      className={`h-[88px] border-b border-r border-gray-200 transition-colors dark:border-[#2d2d2d] hover:bg-red-50 dark:hover:bg-[#2a1b1e] focus:outline-none ${isSelected ? 'bg-red-50 ring-2 ring-inset ring-[#E4032C] dark:bg-[#3a2026] dark:ring-[#E4032C]' : 'bg-white dark:bg-[#1c1c1c]'}`} 
+                      title={`${room.name} ${time} seç`}
+                    ></button>
+                  );
+                })}
+
+              </div>
+            ))}
           </div>
         </div>
 
-        {hasSelectedRange && selectedSlot && <aside className="flex min-h-[520px] w-full flex-col border border-gray-200 bg-white p-3 dark:border-[#2d2d2d] dark:bg-[#1c1c1c] xl:w-[240px]">
-          <div className="flex items-start justify-between border-b border-gray-200 pb-3 dark:border-[#2d2d2d]"><h2 className="text-base font-bold">Rezervasyon Özeti</h2><button title="Rezervasyon özetini kapat" onClick={clearSelection} className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"><span className="material-symbols-outlined text-[18px]">close</span></button></div>
-          <div className="mt-3 border-l-2 border-[#ed002d] bg-gray-100 p-3 dark:bg-[#1b1d1f]"><span className="text-[10px]">Seçilen Oda</span><strong className="mt-1 block text-sm">{selectedSlot.room.name}</strong><div className="mt-2 flex gap-1"><span className="bg-gray-200 px-2 py-1 text-[10px] dark:bg-[#303236]">{selectedSlot.room.capacity}</span><span className="bg-gray-200 px-2 py-1 text-[10px] dark:bg-[#303236]">{selectedSlot.room.features[0]}</span></div></div>
-          <div className="mt-4 grid grid-cols-2 gap-2"><label className="text-[10px]">Tarih<input readOnly value={formatDate(selectedDate)} className="mt-1 h-9 w-full bg-gray-100 p-2 text-[10px] outline-none dark:bg-[#36383a]" /></label><label className="text-[10px]">Saat<div className="mt-1 h-9 w-full overflow-y-auto bg-gray-100 p-2 text-[10px] leading-5 outline-none dark:bg-[#36383a]">{formatSelectedRanges(selectedSlot.slots).map((range) => <div key={range}>{range}</div>)}</div></label></div>
-          <label className="mt-4 text-[10px]">Toplantı Başlığı<input value={reservationTitle} onChange={(event) => setPendingTitle(event.target.value)} placeholder="Başlık girin..." className="mt-1 w-full border border-gray-300 bg-transparent p-2 text-[11px] outline-none focus:border-[#ed002d] dark:border-[#3a3d41]" /></label>
-          <label className="mt-3 text-[10px]">Katılımcılar (Opsiyonel)<input placeholder="E-posta ekle..." className="mt-1 w-full border border-gray-300 bg-transparent p-2 text-[11px] outline-none focus:border-[#ed002d] dark:border-[#3a3d41]" /></label>
-          <button onClick={confirmReservation} disabled={!reservationTitle.trim()} className="mt-auto bg-[#ed002d] py-3 text-xs font-bold text-white hover:bg-[#c9002a] disabled:cursor-not-allowed disabled:opacity-50">Rezervasyonu Onayla</button>
-        </aside>}
+        {/* SAĞ TARAF: REZERVASYON ÖZET PANELİ (h-fit ile yüksekliği içindeki veriye göre ayarlanır) */}
+        {hasSelectedRange && selectedSlot && (
+          <aside className="flex h-fit w-full flex-col border border-gray-200 bg-white rounded-lg shadow-sm p-5 dark:border-[#2d2d2d] dark:bg-[#1c1c1c] xl:w-[280px] shrink-0">
+            
+            <div className="flex items-center justify-between border-b border-gray-200 pb-4 dark:border-[#2d2d2d]">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">Rezervasyon Özeti</h2>
+              <button title="Rezervasyon özetini kapat" onClick={clearSelection} className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            <div className="mt-5 border-l-[3px] border-[#E4032C] bg-gray-50 rounded-r p-3.5 dark:bg-[#1a1a1a]">
+              <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Seçilen Oda</span>
+              <strong className="mt-1 block text-sm text-gray-900 dark:text-white">{selectedSlot.room.name}</strong>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <span className="bg-white border border-gray-200 px-2 py-1 rounded text-[11px] font-semibold text-gray-600 dark:bg-[#2a2a2a] dark:border-[#333] dark:text-gray-300">{selectedSlot.room.capacity}</span>
+                {selectedSlot.room.features.slice(0, 1).map(f => (
+                  <span key={f} className="bg-white border border-gray-200 px-2 py-1 rounded text-[11px] font-semibold text-gray-600 dark:bg-[#2a2a2a] dark:border-[#333] dark:text-gray-300">{f}</span>
+                ))}
+              </div>
+            </div>
+            
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1.5">Tarih</label>
+                <input readOnly value={formatDate(selectedDate)} className="w-full bg-gray-50 border border-gray-200 rounded p-2 text-xs font-semibold text-gray-800 outline-none dark:bg-[#141414] dark:border-[#3d3d3d] dark:text-gray-200" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1.5">Saat</label>
+                <div className="w-full max-h-24 overflow-y-auto bg-gray-50 border border-gray-200 rounded p-2 text-xs font-semibold text-gray-800 dark:bg-[#141414] dark:border-[#3d3d3d] dark:text-gray-200 space-y-1">
+                  {formatSelectedRanges(selectedSlot.slots).map((range) => <div key={range}>{range}</div>)}
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-5">
+              <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1.5">Toplantı Başlığı</label>
+              <input value={reservationTitle} onChange={(event) => setPendingTitle(event.target.value)} placeholder="Örn: Proje İncelemesi" className="w-full border border-gray-300 rounded bg-white p-2.5 text-sm text-gray-900 outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C] dark:border-[#3d3d3d] dark:bg-[#141414] dark:text-white transition-colors" />
+            </div>
+            
+            <div className="mt-4 mb-6">
+              <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1.5">Katılımcılar (Opsiyonel)</label>
+              <input placeholder="E-posta ekle..." className="w-full border border-gray-300 rounded bg-white p-2.5 text-sm text-gray-900 outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C] dark:border-[#3d3d3d] dark:bg-[#141414] dark:text-white transition-colors" />
+            </div>
+            
+            <button onClick={confirmReservation} disabled={!reservationTitle.trim()} className="mt-auto w-full bg-[#E4032C] py-3 rounded text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              Rezervasyonu Onayla
+            </button>
+          </aside>
+        )}
       </div>
     </section>
   );

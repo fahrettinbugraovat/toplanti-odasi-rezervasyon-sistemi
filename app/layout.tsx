@@ -3,10 +3,11 @@ import type { Metadata } from 'next';
 import AppLayout from './components/layout/AppLayout';
 import { ThemeProvider } from './context/ThemeContext';
 import { ReservationProvider } from './context/ReservationContext';
-import { ToastProvider } from './context/ToastContext'; // Toast Provider eklendi
+import { ToastProvider } from './context/ToastContext'; 
+import { UserProvider } from './context/UserContext'; // EKLENDİ
 
 export const metadata: Metadata = {
-  title: 'RoomReserve - Panel Özeti',
+  title: 'RoomReserve',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -32,13 +33,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
-          <ReservationProvider>
-            <ToastProvider> {/* Bütün uygulamayı Toast yapısıyla sarmaladık */}
-              <AppLayout>
-                {children}
-              </AppLayout>
-            </ToastProvider>
-          </ReservationProvider>
+          <UserProvider> {/* EKLENDİ */}
+            <ReservationProvider>
+              <ToastProvider> 
+                <AppLayout>
+                  {children}
+                </AppLayout>
+              </ToastProvider>
+            </ReservationProvider>
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

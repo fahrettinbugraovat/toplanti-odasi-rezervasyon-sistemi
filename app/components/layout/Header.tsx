@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link'; // Yönlendirmeleri kusursuzlaştırmak için eklendi
+import Link from 'next/link';
+import { useUser } from '../../context/UserContext'; 
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -9,10 +10,9 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
-  
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  
   const profileRef = useRef<HTMLDivElement>(null);
+  const { user, mounted } = useUser(); 
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -32,8 +32,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       case '/rooms': return 'Toplantı Odaları';
       case '/calendar': return 'Rezervasyon';
       case '/my-meetings': return 'Toplantılarım';
-      case '/new-reservation': return 'Yeni Rezervasyon';
-      case '/profile-settings': return 'Profil Ayarları';
+      case '/profile': return 'Profil Ayarları';
       case '/admin': return 'Yönetici Paneli';
       default: return 'Panel Özeti';
     }
@@ -56,36 +55,40 @@ export default function Header({ onMenuClick }: HeaderProps) {
             {getPageTitle()}
           </h1>
         </div>
-
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:hidden flex items-center justify-center pointer-events-none">
-          <Link href="/" aria-label="Ana sayfa" className="pointer-events-auto">
-            <img src="/trtlogo.png" alt="TRT Logo" className="h-6 w-auto object-contain" />
-          </Link>
-        </div>
         
         <div className="flex items-center gap-3 md:gap-5">
           <div className="relative ml-1" ref={profileRef}>
             <div onClick={() => setIsProfileOpen(!isProfileOpen)} className={`w-9 h-9 md:w-10 md:h-10 rounded-full overflow-hidden border-2 cursor-pointer flex items-center justify-center transition-colors ${isProfileOpen ? 'border-[#E4032C]' : 'border-gray-200 dark:border-[#2d2d2d] hover:border-gray-400'}`}>
-              <span className="material-symbols-outlined text-[28px] text-gray-500 dark:text-gray-400">account_circle</span>
+              {mounted && user.profilePhoto ? (
+                <img src={user.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-[28px] text-gray-500 dark:text-gray-400">account_circle</span>
+              )}
             </div>
 
             {isProfileOpen && (
-              <div className="absolute right-0 mt-3 w-60 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-3 w-64 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] flex flex-col items-start">
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">Ahmet Yılmaz</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">ahmet.yilmaz@sirket.com</span>
-                  <span className="mt-2 text-[10px] font-bold tracking-wider bg-[#E4032C] text-white px-2 py-0.5 rounded-full uppercase">Admin</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white truncate w-full">{mounted ? user.fullName : 'Yükleniyor...'}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate w-full">{mounted ? user.email : ''}</span>
+                  <span className="mt-2 text-[10px] font-bold tracking-wider bg-[#E4032C] text-white px-2 py-0.5 rounded-full uppercase">{mounted ? user.role : 'Admin'}</span>
                 </div>
+                
                 <div className="py-1">
-                  <Link href="/profile-settings" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] flex items-center gap-3">
+                  <Link href="/profile" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] flex items-center gap-3">
                     <span className="material-symbols-outlined text-[20px]">manage_accounts</span>Profil Ayarları
                   </Link>
-                  <Link href="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[20px]">shield_person</span>Yönetici Paneli
-                  </Link>
+                  
+                  {/* YÖNETİCİ PANELİ BUTONU - Sadece Adminlere Görünür */}
+                  {mounted && user.role.toLowerCase() === 'admin' && (
+                    <Link href="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>Yönetici Paneli
+                    </Link>
+                  )}
                 </div>
+
                 <div className="py-1 border-t border-gray-200 dark:border-[#2d2d2d]">
-                  <Link href="/login" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3">
+                  <Link href="/" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3">
                     <span className="material-symbols-outlined text-[20px]">logout</span>Çıkış Yap
                   </Link>
                 </div>
@@ -94,7 +97,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </div>
         </div>
       </header>
-
     </>
   );
 }
