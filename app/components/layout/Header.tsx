@@ -42,12 +42,15 @@ export default function Header({ onMenuClick }: HeaderProps) {
     <>
       <header className="bg-white dark:bg-[#1c1c1c] border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center h-[72px] px-4 md:px-6 shrink-0 w-full z-50 relative">
         
+        {/* SOL KISIM */}
         <div className="flex items-center">
+          {/* Masaüstü Logo */}
           <div className="hidden md:flex mr-5 items-center">
             <Link href="/" aria-label="Ana sayfa">
               <img src="/trtlogo.png" alt="TRT Logo" className="h-8 w-auto object-contain" />
             </Link>
           </div>
+          {/* Hamburger Menü */}
           <button onClick={onMenuClick} className="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded hover:bg-gray-100 dark:hover:bg-[#2a2a2a] mr-3">
             <span className="material-symbols-outlined text-[26px]">menu</span>
           </button>
@@ -56,6 +59,17 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </h1>
         </div>
         
+        {/* ========================================================= */}
+        {/* ORTA KISIM: MOBİL TRT LOGOSU (SADECE MOBİLDE VE TAM ORTADA) */}
+        {/* ========================================================= */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:hidden flex items-center justify-center">
+          <Link href="/" aria-label="Ana sayfa">
+            <img src="/trtlogo.png" alt="TRT Logo" className="h-7 w-auto object-contain" />
+          </Link>
+        </div>
+        {/* ========================================================= */}
+
+        {/* SAĞ KISIM: Profil Menüsü */}
         <div className="flex items-center gap-3 md:gap-5">
           <div className="relative ml-1" ref={profileRef}>
             <div onClick={() => setIsProfileOpen(!isProfileOpen)} className={`w-9 h-9 md:w-10 md:h-10 rounded-full overflow-hidden border-2 cursor-pointer flex items-center justify-center transition-colors ${isProfileOpen ? 'border-[#E4032C]' : 'border-gray-200 dark:border-[#2d2d2d] hover:border-gray-400'}`}>
@@ -72,7 +86,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   <span className="text-sm font-bold text-gray-900 dark:text-white truncate w-full">{mounted ? user.fullName : 'Yükleniyor...'}</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate w-full">{mounted ? user.email : ''}</span>
                   
-                  {/* KULLANICI ADI BÖLÜMÜ (Eğer username varsa gösterilir) */}
                   {mounted && user.username && (
                     <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-medium truncate w-full">
                       @{user.username}

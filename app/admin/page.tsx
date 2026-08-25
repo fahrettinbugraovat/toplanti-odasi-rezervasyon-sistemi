@@ -17,7 +17,20 @@ export default function AdminPanelPage() {
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'ozet' | 'odalar' | 'rezervasyonlar' | 'onaylar'>('ozet');
-  const [newRoom, setNewRoom] = useState({ name: '', capacity: '', features: '' });
+  
+  // YENİ: Oda ekleme/düzenleme için form state'i ve düzenleme modu
+  const [roomForm, setRoomForm] = useState({ name: '', capacity: '', features: '' });
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [deletingRoom, setDeletingRoom] = useState<any>(null); // Silme onayı için
+
+  // YENİ: Anlık saat durumu (Geçmiş rezervasyonları tespit etmek için)
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 60000); // Her dakikada bir kontrol eder
+    return () => clearInterval(timer);
+  }, []);
 
   // --- YETKİLENDİRME KONTROLÜ ---
   useEffect(() => {
@@ -28,53 +41,148 @@ export default function AdminPanelPage() {
 
   if (!mounted || user.role.toLowerCase() !== 'admin') return null;
 
+  // --- ZAMAN VE TAMAMLANMA KONTROLÜ ---
+  const getLocalYYYYMMDD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const isMeetingCompleted = (op: any) => {
+    if (!now) return false;
+    const currentYear = new Date(now).getFullYear();
+    const todayStrLocal = getLocalYYYYMMDD(new Date(now));
+    
+    let parsedDate = op.date;
+    if (parsedDate === 'Bugün') parsedDate = todayStrLocal;
+    else if (parsedDate === 'Yarın') {
+       const tmr = new Date(now); tmr.setDate(tmr.getDate() + 1);
+       parsedDate = getLocalYYYYMMDD(tmr);
+    } else {
+       const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+       const parts = (op.date || "").split(' ');
+       if (parts.length === 2) {
+          const day = parseInt(parts[0], 10);
+          const monthIndex = months.indexOf(parts[1]);
+          if (monthIndex !== -1 && !isNaN(day)) {
+             const m = String(monthIndex + 1).padStart(2, '0');
+             const d = String(day).padStart(2, '0');
+             parsedDate = `${currentYear}-${m}-${d}`;
+          }
+       }
+    }
+
+    if (parsedDate < todayStrLocal) return true; 
+    if (parsedDate > todayStrLocal) return false; 
+    
+    const detailsParts = (op.details || '').split(' • ');
+    if (detailsParts.length >= 2) {
+       const timeStr = detailsParts[1].trim();
+       if (timeStr.includes(' - ')) {
+         const endStr = timeStr.split(' - ')[1];
+         const endHour = parseInt(endStr.split(':')[0], 10);
+         const endMin = parseInt(endStr.split(':')[1], 10);
+         const d = new Date(now);
+         const currentMins = d.getHours() * 60 + d.getMinutes();
+         const endMins = endHour * 60 + endMin;
+         return currentMins >= endMins;
+       }
+    }
+    return false;
+  };
+
   // --- DİNAMİK VERİ FİLTRELEME ---
-  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor');
+  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor' && !isMeetingCompleted(op));
   const cancelledOperations = operations.filter((op: any) => op.status === 'iptal');
   const pendingOperations = operations.filter((op: any) => op.status === 'bekliyor');
 
-  // --- AKILLI SIRALAMA ---
   const sortedOperationsForTable = [...operations].sort((a: any, b: any) => {
-    const getStatusWeight = (status: string) => {
-      if (status === 'bekliyor') return 1;
-      if (status === 'aktif' || !status) return 2;
-      if (status === 'iptal') return 3;
-      return 4;
+    const getStatusWeight = (op: any) => {
+      if (op.status === 'bekliyor') return 1;
+      if (op.status === 'iptal') return 4;
+      if (isMeetingCompleted(op)) return 3; 
+      return 2; 
     };
-    const weightA = getStatusWeight(a.status);
-    const weightB = getStatusWeight(b.status);
+    const weightA = getStatusWeight(a);
+    const weightB = getStatusWeight(b);
     if (weightA !== weightB) return weightA - weightB;
     return b.id - a.id; 
   });
 
-  // --- ODA EKLEME ---
-  const handleAddRoom = () => {
-    if (!newRoom.name.trim() || !newRoom.capacity.trim() || !newRoom.features.trim()) {
+  // --- ODA YÖNETİMİ: EKLEME VE GÜNCELLEME ---
+  const handleSaveRoom = () => {
+    if (!roomForm.name.trim() || !roomForm.capacity.trim() || !roomForm.features.trim()) {
       showToast({ type: 'error', title: 'Eksik Bilgi', message: 'Lütfen tüm oda bilgilerini doldurun.' });
       return;
     }
-    if (isNaN(Number(newRoom.capacity))) {
+    if (isNaN(Number(roomForm.capacity))) {
       showToast({ type: 'error', title: 'Geçersiz Kapasite', message: 'Kapasite sadece sayısal bir değer olmalıdır.' });
       return;
     }
 
     try {
-      const featuresArray = newRoom.features.split(',').map(f => f.trim()).filter(f => f !== '');
-      const addedRoom = {
-        id: Date.now().toString(),
-        name: newRoom.name.trim(),
-        capacity: `${newRoom.capacity.trim()} Kişi`,
-        features: featuresArray,
-        status: 'Müsait' as 'Müsait',
-        lockEndTime: null
-      };
-
-      setRooms([...rooms, addedRoom]); 
-      setNewRoom({ name: '', capacity: '', features: '' }); 
-      showToast({ type: 'success', title: 'Oda Eklendi', message: 'Toplantı odası başarıyla sisteme eklendi.' });
+      const featuresArray = roomForm.features.split(',').map(f => f.trim()).filter(f => f !== '');
+      
+      if (editingRoomId) {
+        // GÜNCELLEME İŞLEMİ
+        const updatedRooms = rooms.map(r => r.id === editingRoomId ? {
+          ...r,
+          name: roomForm.name.trim(),
+          capacity: `${roomForm.capacity.trim()} Kişi`,
+          features: featuresArray
+        } : r);
+        setRooms(updatedRooms);
+        setEditingRoomId(null);
+        showToast({ type: 'success', title: 'Oda Güncellendi', message: 'Toplantı odası bilgileri başarıyla güncellendi.' });
+      } else {
+        // YENİ EKLEME İŞLEMİ
+        const addedRoom = {
+          id: Date.now().toString(),
+          name: roomForm.name.trim(),
+          capacity: `${roomForm.capacity.trim()} Kişi`,
+          features: featuresArray,
+          status: 'Müsait' as 'Müsait',
+          lockEndTime: null
+        };
+        setRooms([...rooms, addedRoom]); 
+        showToast({ type: 'success', title: 'Oda Eklendi', message: 'Toplantı odası başarıyla sisteme eklendi.' });
+      }
+      
+      setRoomForm({ name: '', capacity: '', features: '' }); 
     } catch (error) {
-      showToast({ type: 'error', title: 'Oda Eklenemedi', message: 'Toplantı odası eklenirken bir hata oluştu.' });
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'Oda kaydedilirken bir hata oluştu.' });
     }
+  };
+
+  // Düzenle Butonuna Tıklanınca Formu Doldurur
+  const handleEditRoomClick = (room: any) => {
+    setEditingRoomId(room.id);
+    setRoomForm({
+      name: room.name,
+      capacity: room.capacity.replace(' Kişi', '').trim(),
+      features: room.features.join(', ')
+    });
+    // Form kısmına yumuşak geçiş yapmak (scroll) istenirse eklenebilir, şimdilik yan yana oldukları için direkt dolacak.
+  };
+
+  const handleCancelRoomEdit = () => {
+    setEditingRoomId(null);
+    setRoomForm({ name: '', capacity: '', features: '' });
+  };
+
+  // --- ODA SİLME İŞLEMİ ---
+  const handleConfirmDeleteRoom = () => {
+    if (!deletingRoom) return;
+    setRooms(rooms.filter(r => r.id !== deletingRoom.id));
+    setDeletingRoom(null);
+    
+    // Eğer sildiğimiz odayı tam o an düzenliyorsak formu da sıfırla
+    if (editingRoomId === deletingRoom.id) {
+      handleCancelRoomEdit();
+    }
+    
+    showToast({ type: 'success', title: 'Oda Silindi', message: 'Toplantı odası sistemden tamamen kaldırıldı.' });
   };
 
   // --- REZERVASYON İPTAL İŞLEMİ ---
@@ -95,14 +203,8 @@ export default function AdminPanelPage() {
   };
 
   return (
-    // DIŞ SCROLL KALDIRILDI: h-full ve overflow-hidden eklendi. Listelerin içi scroll edilecek.
     <div className="w-full flex flex-col gap-5 h-full max-w-[1400px] mx-auto overflow-hidden">
       
-      <div className="shrink-0 pt-2">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Yönetici Paneli</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm md:text-base">Sistem ayarlarını, toplantı odalarını ve rezervasyonları buradan yönetebilirsiniz.</p>
-      </div>
-
       {/* SEKME MENÜSÜ */}
       <div className="flex border-b border-gray-200 dark:border-[#2d2d2d] shrink-0 gap-6 overflow-x-auto hide-scrollbar">
         <button onClick={() => setActiveTab('ozet')} className={`pb-3 text-sm font-bold transition-colors relative whitespace-nowrap ${activeTab === 'ozet' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
@@ -126,7 +228,7 @@ export default function AdminPanelPage() {
         </button>
       </div>
 
-      {/* İÇERİK ALANI (Esnek ve listeleri kapsayacak bölüm) */}
+      {/* İÇERİK ALANI */}
       <div className="flex-1 min-h-0 flex flex-col">
         
         {/* ==================================================== */}
@@ -134,8 +236,6 @@ export default function AdminPanelPage() {
         {/* ==================================================== */}
         {activeTab === 'ozet' && (
           <div className="flex flex-col gap-5 flex-1 min-h-0">
-            
-            {/* ÜST İSTATİSTİK KARTLARI (Daralmaz) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 shrink-0">
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg p-5 flex items-center justify-between shadow-sm">
                 <div>
@@ -166,10 +266,7 @@ export default function AdminPanelPage() {
               </div>
             </div>
 
-            {/* DİNAMİK KART LİSTELERİ (Esnek alan - İçeride Scroll) */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 flex-1 min-h-0">
-              
-              {/* AKTİF REZERVASYONLAR */}
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg shadow-sm flex flex-col h-full overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-[#2d2d2d] shrink-0">
                   <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -202,7 +299,6 @@ export default function AdminPanelPage() {
                 </div>
               </div>
 
-              {/* İPTAL EDİLENLER */}
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg shadow-sm flex flex-col h-full overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-[#2d2d2d] shrink-0">
                   <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -247,27 +343,31 @@ export default function AdminPanelPage() {
             <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg shadow-sm flex flex-col h-full overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] shrink-0">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <span className="material-symbols-outlined text-gray-500">add_box</span>
-                  Toplantı Odası Ekle
+                  <span className="material-symbols-outlined text-gray-500">{editingRoomId ? 'edit_square' : 'add_box'}</span>
+                  {editingRoomId ? 'Toplantı Odasını Düzenle' : 'Toplantı Odası Ekle'}
                 </h2>
               </div>
               <div className="p-6 md:p-8 space-y-5 flex-1 min-h-0 overflow-y-auto pb-24">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Oda İsmi</label>
-                  <input type="text" value={newRoom.name} onChange={e => setNewRoom({...newRoom, name: e.target.value})} placeholder="Örn: Huddle Room" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
+                  <input type="text" value={roomForm.name} onChange={e => setRoomForm({...roomForm, name: e.target.value})} placeholder="Örn: Huddle Room" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Kapasite (Kişi Sayısı)</label>
-                  <input type="number" value={newRoom.capacity} onChange={e => setNewRoom({...newRoom, capacity: e.target.value})} placeholder="Örn: 10" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
+                  <input type="number" value={roomForm.capacity} onChange={e => setRoomForm({...roomForm, capacity: e.target.value})} placeholder="Örn: 10" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Özellikler (Virgülle ayırın)</label>
-                  <input type="text" value={newRoom.features} onChange={e => setNewRoom({...newRoom, features: e.target.value})} placeholder="Örn: TV, Kamera, Mikrofon" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
+                  <input type="text" value={roomForm.features} onChange={e => setRoomForm({...roomForm, features: e.target.value})} placeholder="Örn: TV, Kamera, Mikrofon" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
                 </div>
               </div>
               <div className="p-5 md:p-6 border-t border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#1a1a1a] flex justify-end gap-3 shrink-0">
-                <button onClick={() => setNewRoom({name: '', capacity: '', features: ''})} className="px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333] rounded transition-colors">Temizle</button>
-                <button onClick={handleAddRoom} className="px-8 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">Odayı Ekle</button>
+                <button onClick={handleCancelRoomEdit} className="px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333] rounded transition-colors">
+                  {editingRoomId ? 'Vazgeç' : 'Temizle'}
+                </button>
+                <button onClick={handleSaveRoom} className="px-8 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
+                  {editingRoomId ? 'Değişiklikleri Kaydet' : 'Odayı Ekle'}
+                </button>
               </div>
             </div>
 
@@ -280,14 +380,23 @@ export default function AdminPanelPage() {
               </div>
               <div className="p-2 flex flex-col flex-1 min-h-0 overflow-y-auto pb-24">
                 {rooms.map((room) => (
-                  <div key={room.id} className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-[#2d2d2d] last:border-0 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors rounded">
+                  <div key={room.id} className={`flex justify-between items-center p-4 border-b border-gray-100 dark:border-[#2d2d2d] last:border-0 transition-colors rounded ${editingRoomId === room.id ? 'bg-red-50 dark:bg-red-900/10 border-l-4 border-l-[#E4032C]' : 'hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'}`}>
                     <div>
                       <p className="font-bold text-sm text-gray-900 dark:text-white">{room.name}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{room.capacity} • {room.features.join(', ')}</p>
                     </div>
-                    <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${room.status === 'Müsait' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-500' : 'bg-gray-100 text-gray-600 dark:bg-[#333] dark:text-gray-400'}`}>
-                      Sistemde
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded mr-2 hidden sm:block ${room.status === 'Müsait' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-500' : 'bg-gray-100 text-gray-600 dark:bg-[#333] dark:text-gray-400'}`}>
+                        Sistemde
+                      </span>
+                      {/* DÜZENLE VE SİL BUTONLARI EKLENDİ */}
+                      <button onClick={() => handleEditRoomClick(room)} title="Düzenle" className="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded hover:bg-gray-200 dark:hover:bg-[#333]">
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                      </button>
+                      <button onClick={() => setDeletingRoom(room)} title="Sil" className="p-1.5 text-gray-500 hover:text-[#E4032C] dark:text-gray-400 dark:hover:text-red-500 transition-colors rounded hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -296,7 +405,7 @@ export default function AdminPanelPage() {
         )}
 
         {/* ==================================================== */}
-        {/* 3. SEKME: TÜM REZERVASYONLAR (AKILLI SIRALAMALI)     */}
+        {/* 3. SEKME: TÜM REZERVASYONLAR                         */}
         {/* ==================================================== */}
         {activeTab === 'rezervasyonlar' && (
           <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg overflow-hidden shadow-sm flex flex-col h-full">
@@ -320,12 +429,13 @@ export default function AdminPanelPage() {
                   {sortedOperationsForTable.map((op: any) => {
                     const isCancelled = op.status === 'iptal';
                     const isPending = op.status === 'bekliyor';
-                    const isAct = op.status === 'aktif' || !op.status;
+                    const isCompleted = isMeetingCompleted(op);
+                    const isAct = (op.status === 'aktif' || !op.status) && !isCompleted;
                     
                     return (
-                      <tr key={op.id} className={`hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors ${isCancelled ? 'opacity-50' : isPending ? 'bg-amber-50/30 dark:bg-amber-900/10' : ''}`}>
+                      <tr key={op.id} className={`hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors ${(isCancelled || isCompleted) ? 'opacity-50' : isPending ? 'bg-amber-50/30 dark:bg-amber-900/10' : ''}`}>
                         <td className="px-6 py-4">
-                          <p className={`font-bold text-sm ${isCancelled ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>{op.title}</p>
+                          <p className={`font-bold text-sm ${(isCancelled || isCompleted) ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>{op.title}</p>
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-sm font-semibold">{isPending ? op.pendingChanges?.date : op.date}</p>
@@ -333,6 +443,7 @@ export default function AdminPanelPage() {
                         </td>
                         <td className="px-6 py-4">
                           {isAct && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-500">Aktif</span>}
+                          {isCompleted && !isCancelled && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-500 flex items-center gap-1 w-max"><span className="material-symbols-outlined text-[14px]">check_circle</span> Tamamlandı</span>}
                           {isCancelled && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-gray-200 text-gray-600 dark:bg-[#333] dark:text-gray-400">İptal Edildi</span>}
                           {isPending && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-500 flex items-center gap-1 w-max"><span className="material-symbols-outlined text-[14px]">schedule</span> Onay Bekliyor</span>}
                         </td>
@@ -345,8 +456,8 @@ export default function AdminPanelPage() {
                           ) : (
                             <button 
                               onClick={() => handleCancelReservation(op.id)} 
-                              disabled={isCancelled}
-                              className={`px-3 py-1 text-xs font-bold rounded transition-colors ${isCancelled ? 'opacity-0 cursor-not-allowed' : 'bg-white border border-[#E4032C] text-[#E4032C] hover:bg-[#E4032C] hover:text-white dark:bg-transparent dark:border-[#E4032C] dark:hover:bg-[#E4032C] dark:hover:text-white'}`}
+                              disabled={isCancelled || isCompleted}
+                              className={`px-3 py-1 text-xs font-bold rounded transition-colors ${(isCancelled || isCompleted) ? 'opacity-0 cursor-not-allowed' : 'bg-white border border-[#E4032C] text-[#E4032C] hover:bg-[#E4032C] hover:text-white dark:bg-transparent dark:border-[#E4032C] dark:hover:bg-[#E4032C] dark:hover:text-white'}`}
                             >
                               İptal Et
                             </button>
@@ -415,6 +526,34 @@ export default function AdminPanelPage() {
         )}
 
       </div>
+
+      {/* ODA SİLME ONAY MODALI */}
+      {deletingRoom && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121]">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#E4032C] text-[20px]">warning</span>
+                Oda Silme Onayı
+              </h3>
+            </div>
+            <div className="p-5">
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-5">
+                <strong>{deletingRoom.name}</strong> adlı toplantı odasını sistemden tamamen silmek istediğinize emin misiniz?
+              </p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setDeletingRoom(null)} className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded transition-colors">
+                  Vazgeç
+                </button>
+                <button onClick={handleConfirmDeleteRoom} className="px-4 py-2 text-sm font-bold bg-[#E4032C] text-white hover:bg-red-700 rounded transition-colors">
+                  Evet, Odayı Sil
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

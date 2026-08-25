@@ -11,14 +11,74 @@ export default function MyMeetingsPage() {
   const { theme } = useTheme(); 
   const { showToast } = useToast(); 
   
-  const [activeTab, setActiveTab] = useState<'gelecek' | 'gecmis' | 'iptal'>('gelecek');
+  const [activeTab, setActiveTab] = useState<'gelecek' | 'iptal'>('gelecek');
 
   const [editingOp, setEditingOp] = useState<any>(null);
-  const [confirmEditOp, setConfirmEditOp] = useState<any>(null); // Onaya gönder penceresi için
+  const [confirmEditOp, setConfirmEditOp] = useState<any>(null); 
   const [editForm, setEditForm] = useState({ title: '', room: '', time: '', date: '' });
   const [originalTime, setOriginalTime] = useState("");
+  const [now, setNow] = useState<number | null>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getLocalYYYYMMDD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const todayStr = getLocalYYYYMMDD(new Date());
+
+  const formatDateForList = (dateString: string) => {
+    if (!dateString) return "Belirsiz"; 
+    const d = new Date(dateString); 
+    if (isNaN(d.getTime())) return "Belirsiz";
+    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+    return `${d.getDate()} ${months[d.getMonth()]}`;
+  };
+
+  const isPastOperationDay = (op: any) => {
+    if (!now) return false;
+    const currentYear = new Date(now).getFullYear();
+    const todayStrLocal = getLocalYYYYMMDD(new Date(now));
+    
+    if (op.date === 'Bugün' || op.date === 'Yarın') return false;
+    
+    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+    const parts = (op.date || "").split(' ');
+    
+    if (parts.length === 2) {
+       const day = parseInt(parts[0], 10);
+       const monthIndex = months.indexOf(parts[1]);
+       if (monthIndex !== -1 && !isNaN(day)) {
+          const m = String(monthIndex + 1).padStart(2, '0');
+          const d = String(day).padStart(2, '0');
+          const opDateStr = `${currentYear}-${m}-${d}`;
+          return opDateStr < todayStrLocal; 
+       }
+    }
+    return false;
+  };
+
+  const getAllBlocks = () => {
+    const blocks: any[] = [];
+    operations.forEach((op: any) => {
+      if (op.status === 'iptal') return;
+      if (op.status === 'bekliyor') {
+        blocks.push({ ...op });
+        if (op.pendingChanges) {
+          blocks.push({ ...op, date: op.pendingChanges.date, details: op.pendingChanges.details });
+        }
+      } else {
+        blocks.push({ ...op });
+      }
+    });
+    return blocks;
+  };
 
   useEffect(() => {
     if (editingOp) {
@@ -41,15 +101,6 @@ export default function MyMeetingsPage() {
     return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, []);
 
-  const formatDateForList = (dateString: string) => {
-    if (!dateString) return "Belirsiz"; 
-    const d = new Date(dateString); 
-    if (isNaN(d.getTime())) return "Belirsiz";
-    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-    return `${d.getDate()} ${months[d.getMonth()]}`;
-  };
-
-  // --- DÜZENLEME ONAY AKIŞI ---
   const handlePreSaveEdit = () => {
     if (!editingOp) return;
     setConfirmEditOp(editingOp);
@@ -61,9 +112,7 @@ export default function MyMeetingsPage() {
     try {
       const newDetails = `${editForm.room} • ${editForm.time}`;
       const newDate = formatDateForList(editForm.date);
-      
       requestOperationEdit(confirmEditOp.id, newDetails, newDate);
-      
       setConfirmEditOp(null);
       showToast({ type: 'success', title: 'Onaya Gönderildi', message: 'Rezervasyon değişikliğiniz yönetici onayına gönderildi.' });
     } catch (error) {
@@ -71,7 +120,6 @@ export default function MyMeetingsPage() {
     }
   };
 
-  // --- İPTAL ETME (SİLME) ---
   const handleCancel = async (id: number) => {
     try {
       cancelOperation(id);
@@ -81,29 +129,40 @@ export default function MyMeetingsPage() {
     }
   };
 
-  const getSlotStatusesForDate = (dateStr: string) => {
-    if (!dateStr) return { occupied: [], reserving: [] };
-    let hash = 0; for (let i = 0; i < dateStr.length; i++) hash += dateStr.charCodeAt(i);
-    const occupied: string[] = []; const reserving: string[] = [];
-    if (hash % 2 === 0) occupied.push("10:00 - 11:00");
-    if (hash % 3 === 0) occupied.push("13:00 - 14:00");
-    if (hash % 4 === 0) occupied.push("15:00 - 16:00");
-    return { occupied, reserving };
-  };
-
-  const slotStatusesEdit = getSlotStatusesForDate(editForm.date);
-
   const displayedOperations = operations.filter((op: any) => {
     if (activeTab === 'iptal') return op.status === 'iptal';
-    if (activeTab === 'gelecek') return op.status !== 'iptal'; 
+    if (activeTab === 'gelecek') return op.status !== 'iptal' && !isPastOperationDay(op); 
     return false; 
   });
+
+  // Modal içerisindeki dolu saatleri bulma
+  let occupiedSlots: string[] = [];
+  if (editingOp && now) {
+    const formattedDate = formatDateForList(editForm.date);
+    const allBlocks = getAllBlocks();
+    
+    allBlocks.forEach((block: any) => {
+      const isTodayMatch = (block.date === 'Bugün' && formattedDate === formatDateForList(getLocalYYYYMMDD(new Date(now))));
+      if (block.date === formattedDate || isTodayMatch) {
+        const parts = (block.details || '').split(' • ');
+        if (parts.length >= 2 && parts[0].trim() === editForm.room && parts[1].trim().includes(' - ')) {
+          const opStartHour = parseInt(parts[1].trim().split(' - ')[0].split(':')[0], 10);
+          const opEndHour = parseInt(parts[1].trim().split(' - ')[1].split(':')[0], 10);
+          TIME_SLOTS.forEach(slot => {
+            const slotStartHour = parseInt(slot.split(' - ')[0].split(':')[0], 10);
+            if (slotStartHour >= opStartHour && slotStartHour < opEndHour) {
+              occupiedSlots.push(slot);
+            }
+          });
+        }
+      }
+    });
+  }
 
   return (
     <div className="w-full flex flex-col h-full gap-6 relative">
       
       
-
       <div className="flex border-b border-gray-200 dark:border-[#2d2d2d] shrink-0 gap-6">
         <button onClick={() => setActiveTab('gelecek')} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'gelecek' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
           Gelecek {activeTab === 'gelecek' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E4032C]"></div>}
@@ -228,17 +287,35 @@ export default function MyMeetingsPage() {
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Saat Aralığı</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {TIME_SLOTS.map(slot => {
+                  
+                  {/* FİLTRELEME: Eğer Seçili Tarih Bugün ise, Sadece Gelecek Saatleri Göster */}
+                  {TIME_SLOTS.filter(slot => {
+                    if (!now || !editForm.date) return true;
+                    const todayStrLocal = getLocalYYYYMMDD(new Date(now));
+                    
+                    if (editForm.date === todayStrLocal) {
+                      const startHourNum = parseInt(slot.split(' - ')[0].split(':')[0], 10);
+                      const startMinNum = parseInt(slot.split(' - ')[0].split(':')[1], 10);
+                      const d = new Date(now);
+                      const currentTotalMins = d.getHours() * 60 + d.getMinutes();
+                      const startTotalMins = startHourNum * 60 + startMinNum;
+                      
+                      // Geçmiş saatler gizlenir (Ancak kullanıcının kendi orjinal saati daima görünür kalır)
+                      if (startTotalMins <= currentTotalMins && slot !== originalTime) {
+                        return false;
+                      }
+                    }
+                    return true;
+                  }).map(slot => {
                     const isSelected = editForm.time === slot; 
-                    const isOccupied = slotStatusesEdit.occupied.includes(slot) && slot !== originalTime; 
-                    const isReserving = slotStatusesEdit.reserving.includes(slot) && slot !== originalTime; 
-                    const isDisabled = isOccupied || isReserving;
+                    const isOccupied = occupiedSlots.includes(slot) && slot !== originalTime; 
+                    const isDisabled = isOccupied;
                     
                     return (
-                      <button key={slot} disabled={isDisabled} onClick={() => setEditForm({...editForm, time: slot})} className={`p-3 rounded border text-base font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${isSelected ? 'bg-[#E4032C] border-[#E4032C] text-white' : isOccupied ? 'bg-gray-100 dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333] text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60' : isReserving ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/40 text-amber-600 dark:text-amber-500 cursor-not-allowed opacity-80' : 'bg-white dark:bg-[#1c1c1c] border-gray-300 dark:border-[#3d3d3d] text-gray-700 dark:text-gray-300 hover:border-[#E4032C] hover:text-[#E4032C]'}`}>
+                      <button key={slot} disabled={isDisabled} onClick={() => setEditForm({...editForm, time: slot})} className={`p-3 rounded border text-base font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${isSelected ? 'bg-[#E4032C] border-[#E4032C] text-white' : isOccupied ? 'bg-gray-100 dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333] text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60' : 'bg-white dark:bg-[#1c1c1c] border-gray-300 dark:border-[#3d3d3d] text-gray-700 dark:text-gray-300 hover:border-[#E4032C] hover:text-[#E4032C]'}`}>
                         <span>{slot}</span>
-                        <span className={`text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-white' : isOccupied ? 'text-gray-400 dark:text-gray-600' : isReserving ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                          {isOccupied ? 'Dolu' : isReserving ? 'İşlemde' : isSelected ? 'Seçildi' : 'Boş'}
+                        <span className={`text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-white' : isOccupied ? 'text-gray-400 dark:text-gray-600' : 'text-emerald-600 dark:text-emerald-500'}`}>
+                          {isOccupied ? 'Dolu' : isSelected ? 'Seçildi' : 'Boş'}
                         </span>
                       </button>
                     )
@@ -255,7 +332,7 @@ export default function MyMeetingsPage() {
         </div>
       )}
 
-      {/* YENİ: ONAYA GÖNDERME UYARI MODALI */}
+      {/* ONAYA GÖNDERME UYARI MODALI */}
       {confirmEditOp && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[110] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden">
