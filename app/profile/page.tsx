@@ -103,7 +103,6 @@ export default function ProfileSettingsPage() {
   if (!mounted) return null;
 
   return (
-    // max-w-[1400px] ve mx-auto ile içerik ortaya hizalandı, pb-32 ile buton için alt boşluk garantiye alındı
     <div className="w-full max-w-[1400px] mx-auto flex flex-col gap-6 md:gap-8 pb-32 overflow-y-auto">
       
       
@@ -216,7 +215,7 @@ export default function ProfileSettingsPage() {
 
           </div>
           <div className="p-5 md:p-6 border-t border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#1a1a1a] flex justify-end">
-            <button onClick={handlePasswordSave} className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 dark:bg-gray-200 dark:hover:bg-white dark:text-gray-900 text-white text-sm font-bold rounded shadow-sm transition-colors">
+            <button onClick={handlePasswordSave} className="px-6 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
               Şifreyi Değiştir
             </button>
           </div>
