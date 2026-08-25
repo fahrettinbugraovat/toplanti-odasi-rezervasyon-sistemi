@@ -16,11 +16,7 @@ export default function RoomsPage() {
   return (
     <div className="w-full flex flex-col h-full overflow-hidden pb-8">
       
-      {/* ÜST BAŞLIK */}
-      <div className="mb-6 shrink-0">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Toplantı Odaları</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm md:text-base">Sistemdeki tüm toplantı odalarını ve özelliklerini buradan inceleyebilirsiniz.</p>
-      </div>
+      
 
       <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#333] rounded-lg shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
         

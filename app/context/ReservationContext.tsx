@@ -1,26 +1,16 @@
 'use client';
-
-import { createContext, useContext, useState } from 'react';
-
-export type RoomStatus = 'Müsait' | 'Dolu' | 'Rezerve Ediliyor';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface Room {
   id: string;
   name: string;
   capacity: string;
   features: string[];
-  status: RoomStatus;
+  status: 'Müsait' | 'Dolu' | 'Rezerve Ediliyor';
   lockEndTime: number | null;
 }
 
-export interface Operation {
-  id: number;
-  title: string;
-  details: string;
-  date: string;
-}
-
-export interface CalendarReservation {
+export interface Reservation {
   id: number;
   roomId: string;
   start: number;
@@ -29,57 +19,141 @@ export interface CalendarReservation {
   date: string | null;
 }
 
-export interface PendingCalendarSelection {
+export interface Operation {
+  id: number;
+  title: string;
+  details: string;
+  date: string;
+  status?: 'aktif' | 'iptal' | 'bekliyor'; // Yeni Statüler
+  pendingChanges?: { // Düzenleme talebi için geçici depo
+    details: string;
+    date: string;
+  };
+}
+
+export interface PendingSelection {
   roomId: string;
   slots: number[];
   date: string;
 }
 
+interface ReservationContextProps {
+  rooms: Room[];
+  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
+  reservations: Reservation[];
+  setReservations: React.Dispatch<React.SetStateAction<Reservation[]>>;
+  operations: Operation[];
+  setOperations: React.Dispatch<React.SetStateAction<Operation[]>>;
+  pendingSelection: PendingSelection | null;
+  setPendingSelection: (selection: PendingSelection | null) => void;
+  pendingTitle: string;
+  setPendingTitle: (title: string) => void;
+  // Yeni Fonksiyonlar
+  requestOperationEdit: (id: number, newDetails: string, newDate: string) => void;
+  approveOperationEdit: (id: number) => void;
+  rejectOperationEdit: (id: number) => void;
+  cancelOperation: (id: number) => void;
+}
+
+const ReservationContext = createContext<ReservationContextProps | undefined>(undefined);
+
+// BAŞLANGIÇ VERİSİ
 const initialRooms: Room[] = [
-  { id: '1', name: 'Boardroom Alpha', capacity: '12 Kişi', features: ['VC Gear'], status: 'Dolu', lockEndTime: null },
-  { id: '2', name: 'Huddle Room 1', capacity: '4 Kişi', features: ['Whiteboard'], status: 'Müsait', lockEndTime: null },
-  { id: '3', name: 'Creative Space', capacity: '8 Kişi', features: ['Projector'], status: 'Müsait', lockEndTime: null },
+  { id: '1', name: 'Boardroom Alpha', capacity: '12 Kişi', features: ['TV', 'Beyaz Tahta', 'Kamera'], status: 'Müsait', lockEndTime: null },
+  { id: '2', name: 'Huddle Room 1', capacity: '4 Kişi', features: ['TV'], status: 'Müsait', lockEndTime: null },
+  { id: '3', name: 'Creative Space', capacity: '8 Kişi', features: ['Beyaz Tahta', 'Projeksiyon'], status: 'Müsait', lockEndTime: null },
 ];
 
 const initialOperations: Operation[] = [
-  { id: 1, title: 'Yönetim Kurulu Toplantısı', details: 'Boardroom Alpha • 14:00 - 15:00', date: 'Bugün' },
-  { id: 2, title: 'Proje Kick-off', details: 'Huddle Room 1 • 09:00 - 10:00', date: 'Yarın' },
-  { id: 3, title: 'Tasarım İncelemesi', details: 'Creative Space • 11:00 - 12:00', date: '22 Eki' },
-  { id: 4, title: 'Aylık Değerlendirme', details: 'Huddle Room 1 • 15:00 - 16:00', date: '23 Eki' },
+  { id: 1, title: 'Proje Değerlendirmesi', details: 'Boardroom Alpha • 10:00 - 12:00', date: 'Bugün', status: 'aktif' },
+  { id: 2, title: 'Tasarım İncelemesi', details: 'Boardroom Alpha • 14:00 - 16:00', date: 'Bugün', status: 'aktif' },
 ];
 
-const initialCalendarReservations: CalendarReservation[] = [
-  { id: 1, roomId: '1', start: 1, end: 3, title: 'Proje Değerlendirmesi', date: null },
-  { id: 2, roomId: '1', start: 5, end: 7, title: 'Tasarım İncelemesi', date: null },
-];
-
-interface ReservationContextValue {
-  rooms: Room[];
-  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
-  operations: Operation[];
-  setOperations: React.Dispatch<React.SetStateAction<Operation[]>>;
-  reservations: CalendarReservation[];
-  setReservations: React.Dispatch<React.SetStateAction<CalendarReservation[]>>;
-  pendingSelection: PendingCalendarSelection | null;
-  setPendingSelection: React.Dispatch<React.SetStateAction<PendingCalendarSelection | null>>;
-  pendingTitle: string;
-  setPendingTitle: React.Dispatch<React.SetStateAction<string>>;
-}
-
-const ReservationContext = createContext<ReservationContextValue | null>(null);
-
-export function ReservationProvider({ children }: { children: React.ReactNode }) {
-  const [rooms, setRooms] = useState(initialRooms);
-  const [operations, setOperations] = useState(initialOperations);
-  const [reservations, setReservations] = useState(initialCalendarReservations);
-  const [pendingSelection, setPendingSelection] = useState<PendingCalendarSelection | null>(null);
+export const ReservationProvider = ({ children }: { children: ReactNode }) => {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [pendingTitle, setPendingTitle] = useState('');
+  const [mounted, setMounted] = useState(false);
 
-  return <ReservationContext.Provider value={{ rooms, setRooms, operations, setOperations, reservations, setReservations, pendingSelection, setPendingSelection, pendingTitle, setPendingTitle }}>{children}</ReservationContext.Provider>;
-}
+  useEffect(() => {
+    const savedRooms = localStorage.getItem('roomsData');
+    const savedOperations = localStorage.getItem('operationsData');
 
-export function useReservationData() {
+    if (savedRooms) setRooms(JSON.parse(savedRooms));
+    else setRooms(initialRooms);
+
+    if (savedOperations) setOperations(JSON.parse(savedOperations));
+    else setOperations(initialOperations);
+
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('roomsData', JSON.stringify(rooms));
+      localStorage.setItem('operationsData', JSON.stringify(operations));
+    }
+  }, [rooms, operations, mounted]);
+
+  // --- YENİ İŞ AKIŞI FONKSİYONLARI ---
+
+  // 1. İptal Et (Siler gibi yapıp statüyü iptal'e çekeriz)
+  const cancelOperation = (id: number) => {
+    setOperations(prev => prev.map(op => op.id === id ? { ...op, status: 'iptal' } : op));
+  };
+
+  // 2. Düzenleme Talebi Gönder (Mevcudu bozmadan beklemeye alır)
+  const requestOperationEdit = (id: number, newDetails: string, newDate: string) => {
+    setOperations(prev => prev.map(op => 
+      op.id === id 
+        ? { ...op, status: 'bekliyor', pendingChanges: { details: newDetails, date: newDate } } 
+        : op
+    ));
+  };
+
+  // 3. Talebi Onayla (Değişiklikleri kalıcı yapar, statüyü aktife çeker)
+  const approveOperationEdit = (id: number) => {
+    setOperations(prev => prev.map(op => {
+      if (op.id === id && op.pendingChanges) {
+        return { 
+          ...op, 
+          details: op.pendingChanges.details, 
+          date: op.pendingChanges.date, 
+          status: 'aktif', 
+          pendingChanges: undefined 
+        };
+      }
+      return op;
+    }));
+  };
+
+  // 4. Talebi Reddet (Bekleyen değişiklikleri siler, eski haline döndürür)
+  const rejectOperationEdit = (id: number) => {
+    setOperations(prev => prev.map(op => 
+      op.id === id 
+        ? { ...op, status: 'aktif', pendingChanges: undefined } 
+        : op
+    ));
+  };
+
+  return (
+    <ReservationContext.Provider value={{ 
+      rooms, setRooms, 
+      reservations, setReservations, 
+      operations, setOperations,
+      pendingSelection, setPendingSelection,
+      pendingTitle, setPendingTitle,
+      requestOperationEdit, approveOperationEdit, rejectOperationEdit, cancelOperation
+    }}>
+      {children}
+    </ReservationContext.Provider>
+  );
+};
+
+export const useReservationData = () => {
   const context = useContext(ReservationContext);
-  if (!context) throw new Error('useReservationData must be used inside ReservationProvider');
+  if (!context) throw new Error("useReservationData must be used within a ReservationProvider");
   return context;
-}
+};

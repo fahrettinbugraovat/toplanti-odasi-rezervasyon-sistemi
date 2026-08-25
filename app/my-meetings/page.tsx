@@ -2,17 +2,19 @@
 import { useState, useEffect } from 'react';
 import { useReservationData } from '../context/ReservationContext';
 import { useTheme } from '../context/ThemeContext'; 
-import { useToast } from '../context/ToastContext'; // TOAST SİSTEMİ EKLENDİ
+import { useToast } from '../context/ToastContext'; 
 
 const TIME_SLOTS = ["09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00"];
 
 export default function MyMeetingsPage() {
-  const { rooms, operations, setOperations } = useReservationData();
+  const { rooms, operations, requestOperationEdit, cancelOperation } = useReservationData();
   const { theme } = useTheme(); 
-  const { showToast } = useToast(); // TOAST FONKSİYONU ÇAĞRILDI
+  const { showToast } = useToast(); 
+  
   const [activeTab, setActiveTab] = useState<'gelecek' | 'gecmis' | 'iptal'>('gelecek');
 
   const [editingOp, setEditingOp] = useState<any>(null);
+  const [confirmEditOp, setConfirmEditOp] = useState<any>(null); // Onaya gönder penceresi için
   const [editForm, setEditForm] = useState({ title: '', room: '', time: '', date: '' });
   const [originalTime, setOriginalTime] = useState("");
 
@@ -34,7 +36,7 @@ export default function MyMeetingsPage() {
   }, [editingOp, todayStr]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setEditingOp(null); };
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') { setEditingOp(null); setConfirmEditOp(null); } };
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, []);
@@ -47,59 +49,42 @@ export default function MyMeetingsPage() {
     return `${d.getDate()} ${months[d.getMonth()]}`;
   };
 
-  // 1. DÜZENLEME İŞLEMİ TOAST ENTEGRASYONU
-  const handleSaveEdit = async () => {
+  // --- DÜZENLEME ONAY AKIŞI ---
+  const handlePreSaveEdit = () => {
     if (!editingOp) return;
+    setConfirmEditOp(editingOp);
+    setEditingOp(null);
+  };
+
+  const handleSendToApproval = () => {
+    if (!confirmEditOp) return;
     try {
-      setOperations(operations.map((op: any) => 
-        op.id === editingOp.id 
-          ? { ...op, title: editForm.title, details: `${editForm.room} • ${editForm.time}`, date: formatDateForList(editForm.date) } 
-          : op
-      ));
-      setEditingOp(null);
+      const newDetails = `${editForm.room} • ${editForm.time}`;
+      const newDate = formatDateForList(editForm.date);
       
-      showToast({
-        type: 'success',
-        title: 'Rezervasyon Güncellendi',
-        message: 'Rezervasyon bilgileriniz başarıyla güncellendi.'
-      });
+      requestOperationEdit(confirmEditOp.id, newDetails, newDate);
+      
+      setConfirmEditOp(null);
+      showToast({ type: 'success', title: 'Onaya Gönderildi', message: 'Rezervasyon değişikliğiniz yönetici onayına gönderildi.' });
     } catch (error) {
-      showToast({
-        type: 'error',
-        title: 'İşlem Başarısız',
-        message: 'Rezervasyon işlemi gerçekleştirilemedi. Lütfen tekrar deneyin.'
-      });
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'Değişiklik talebi gönderilemedi.' });
     }
   };
 
-  // 2. İPTAL ETME (SİLME) İŞLEMİ TOAST ENTEGRASYONU
+  // --- İPTAL ETME (SİLME) ---
   const handleCancel = async (id: number) => {
     try {
-      setOperations(operations.map((op: any) => 
-        op.id === id ? { ...op, status: 'iptal' } : op
-      ));
-      
-      showToast({
-        type: 'success',
-        title: 'Rezervasyon Silindi',
-        message: 'Rezervasyon başarıyla silindi.'
-      });
+      cancelOperation(id);
+      showToast({ type: 'success', title: 'Rezervasyon İptal Edildi', message: 'Rezervasyon başarıyla iptal edildi.' });
     } catch (error) {
-      showToast({
-        type: 'error',
-        title: 'İşlem Başarısız',
-        message: 'Rezervasyon işlemi gerçekleştirilemedi. Lütfen tekrar deneyin.'
-      });
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'İşlem gerçekleştirilemedi.' });
     }
   };
 
   const getSlotStatusesForDate = (dateStr: string) => {
     if (!dateStr) return { occupied: [], reserving: [] };
     let hash = 0; for (let i = 0; i < dateStr.length; i++) hash += dateStr.charCodeAt(i);
-    
-    const occupied: string[] = []; 
-    const reserving: string[] = [];
-    
+    const occupied: string[] = []; const reserving: string[] = [];
     if (hash % 2 === 0) occupied.push("10:00 - 11:00");
     if (hash % 3 === 0) occupied.push("13:00 - 14:00");
     if (hash % 4 === 0) occupied.push("15:00 - 16:00");
@@ -117,10 +102,7 @@ export default function MyMeetingsPage() {
   return (
     <div className="w-full flex flex-col h-full gap-6 relative">
       
-      <div className="shrink-0">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Toplantılarım</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm md:text-base">Tüm toplantı odası rezervasyonlarınızı yönetin.</p>
-      </div>
+      
 
       <div className="flex border-b border-gray-200 dark:border-[#2d2d2d] shrink-0 gap-6">
         <button onClick={() => setActiveTab('gelecek')} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'gelecek' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
@@ -149,6 +131,7 @@ export default function MyMeetingsPage() {
                 const roomObj = rooms?.find((r: any) => r.name === roomName);
                 const capacityStr = roomObj ? roomObj.capacity : 'Bilinmiyor';
                 const isCancelled = op.status === 'iptal';
+                const isPending = op.status === 'bekliyor';
 
                 return (
                   <tr key={op.id} className={`transition-colors group ${isCancelled ? 'bg-gray-50/50 dark:bg-[#1a1a1a]/50 opacity-75' : 'hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'}`}>
@@ -181,6 +164,10 @@ export default function MyMeetingsPage() {
                       <div className="flex items-center justify-end gap-2">
                         {isCancelled ? (
                           <span className="px-3 py-1 text-[11px] font-bold text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded uppercase tracking-wider">İPTAL EDİLDİ</span>
+                        ) : isPending ? (
+                          <span className="px-3 py-1 text-[11px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-500 border border-amber-100 dark:border-amber-900/30 rounded uppercase tracking-wider flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">schedule</span> Onay Bekliyor
+                          </span>
                         ) : (
                           <>
                             <button onClick={() => setEditingOp(op)} className="p-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white transition-colors bg-gray-100 dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded shadow-sm" title="Düzenle">
@@ -210,7 +197,6 @@ export default function MyMeetingsPage() {
       {editingOp && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden">
-            
             <div className="p-5 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] flex justify-between items-center">
               <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[20px]">edit_calendar</span>
@@ -262,10 +248,30 @@ export default function MyMeetingsPage() {
               
               <div className="flex justify-end gap-3 pt-5 mt-2 border-t border-gray-100 dark:border-[#2d2d2d]">
                 <button onClick={() => setEditingOp(null)} className="px-5 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded">İptal</button>
-                <button onClick={handleSaveEdit} disabled={!editForm.time} className={`px-5 py-2.5 text-sm font-bold rounded text-white ${!editForm.time ? 'bg-[#E4032C] opacity-50 cursor-not-allowed' : 'bg-[#E4032C] hover:bg-red-700'}`}>Değişiklikleri Kaydet</button>
+                <button onClick={handlePreSaveEdit} disabled={!editForm.time} className={`px-5 py-2.5 text-sm font-bold rounded text-white ${!editForm.time ? 'bg-[#E4032C] opacity-50 cursor-not-allowed' : 'bg-[#E4032C] hover:bg-red-700'}`}>Kaydet</button>
               </div>
             </div>
-            
+          </div>
+        </div>
+      )}
+
+      {/* YENİ: ONAYA GÖNDERME UYARI MODALI */}
+      {confirmEditOp && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[110] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121]">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-500 text-[20px]">info</span>
+                Rezervasyon Değişikliği
+              </h3>
+            </div>
+            <div className="p-5">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-6">Yaptığınız değişiklik yönetici onayına gönderilecektir. Onaylanana kadar mevcut rezervasyonunuz geçerli kalacaktır.</p>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => { setConfirmEditOp(null); setEditingOp(confirmEditOp); }} className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded">Vazgeç</button>
+                <button onClick={handleSendToApproval} className="px-4 py-2 text-sm font-bold bg-[#E4032C] text-white hover:bg-red-700 rounded transition-colors">Onaya Gönder</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
