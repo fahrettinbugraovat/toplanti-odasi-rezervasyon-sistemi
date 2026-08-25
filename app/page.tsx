@@ -9,19 +9,10 @@ export default function Home() {
   const { rooms, setRooms, operations, setOperations, requestOperationEdit, cancelOperation } = useReservationData();
   const { showToast } = useToast(); 
 
-  // --- DİNAMİK HESAPLAMA ---
-  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor');
-  const totalReservations = activeOperations.length;
-  
-  const totalSlots = rooms.length * TIME_SLOTS.length;
-  const usageRate = totalSlots > 0 ? Math.min(100, Math.round((totalReservations / totalSlots) * 100)) : 0;
-
   const [isMounted, setIsMounted] = useState(false);
-  const [stats, setStats] = useState({ rooms: 0, reservations: 0, usage: 0 });
-  const [isAnimating, setIsAnimating] = useState(true); 
   const [now, setNow] = useState<number | null>(null);
-  const [lockedSlots, setLockedSlots] = useState<Record<string, string | null>>({});
 
+  // --- TARİH VE ZAMAN YARDIMCILARI ---
   const getLocalYYYYMMDD = (date: Date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -36,28 +27,63 @@ export default function Home() {
     return `${d.getDate()} ${months[d.getMonth()]}`;
   };
 
-  // 1. DÜZELTME: Saat diliminin BİTİŞ saati geçmeden o dilim GEÇMİŞ sayılmaz!
+  // YENİ: Rezervasyonun geçmiş bir güne ait olup olmadığını kontrol eder
+  const isPastOperationDay = (op: any) => {
+    if (!now) return false;
+    const currentYear = new Date(now).getFullYear();
+    const todayStrLocal = getLocalYYYYMMDD(new Date(now));
+    
+    if (op.date === 'Bugün' || op.date === 'Yarın') return false;
+    
+    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+    const parts = (op.date || "").split(' ');
+    
+    if (parts.length === 2) {
+       const day = parseInt(parts[0], 10);
+       const monthIndex = months.indexOf(parts[1]);
+       if (monthIndex !== -1 && !isNaN(day)) {
+          const m = String(monthIndex + 1).padStart(2, '0');
+          const d = String(day).padStart(2, '0');
+          const opDateStr = `${currentYear}-${m}-${d}`;
+          return opDateStr < todayStrLocal; // Geçmiş günleri yakalar
+       }
+    }
+    return false;
+  };
+
+  // DİNAMİK FİLTRELEME: İptal olmayan, beklemeyen ve GEÇMİŞ GÜNLERE ait olmayanlar
+  const activeOperations = operations.filter((op: any) => 
+    op.status !== 'iptal' && 
+    op.status !== 'bekliyor' && 
+    !isPastOperationDay(op)
+  );
+
+  const totalReservations = activeOperations.length;
+  const totalSlots = rooms.length * TIME_SLOTS.length;
+  const usageRate = totalSlots > 0 ? Math.min(100, Math.round((totalReservations / totalSlots) * 100)) : 0;
+
+  const [stats, setStats] = useState({ rooms: 0, reservations: 0, usage: 0 });
+  const [isAnimating, setIsAnimating] = useState(true); 
+  const [lockedSlots, setLockedSlots] = useState<Record<string, string | null>>({});
+
   const checkIsPastSlot = (slot: string, targetDateStr: string) => {
     if (!now || !targetDateStr) return false;
     const todayStrLocal = getLocalYYYYMMDD(new Date(now));
     
-    if (targetDateStr < todayStrLocal) return true; // Geçmiş günse kilitli
-    if (targetDateStr > todayStrLocal) return false; // Gelecek günse açık
+    if (targetDateStr < todayStrLocal) return true; 
+    if (targetDateStr > todayStrLocal) return false; 
 
-    // BİTİŞ SAATİNİ REFERANS ALIYORUZ (Örn: 10:00 - 11:00 için 11:00)
     const [, end] = slot.split(' - ');
     const endHourNum = parseInt(end.split(':')[0], 10);
     const endMinNum = parseInt(end.split(':')[1], 10);
     
     const d = new Date(now);
-    // Yalnızca şu anki saat, slotun BİTİŞ saatini geçtiğinde kilitlenir
     if (d.getHours() > endHourNum || (d.getHours() === endHourNum && d.getMinutes() >= endMinNum)) {
       return true;
     }
     return false;
   };
 
-  // 2. KONTROL: Anlık saatte oda doluysa "Dolu" yazar ve buton çalışmaz!
   const isRoomCurrentlyOccupied = (roomName: string) => {
     if (!now) return false;
     const d = new Date(now);
@@ -97,7 +123,6 @@ export default function Home() {
   const [deletingOp, setDeletingOp] = useState<any>(null);
   const [editingOp, setEditingOp] = useState<any>(null);
   const [confirmEditOp, setConfirmEditOp] = useState<any>(null); 
-  
   const [reservingRoomId, setReservingRoomId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: '', room: '', time: '', date: '' });
   const [resForm, setResForm] = useState({ title: '', time: '', date: '' });
@@ -140,7 +165,6 @@ export default function Home() {
     return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, [reservingRoomId]);
 
-  // --- İPTAL İŞLEMİ ---
   const handleConfirmDelete = async () => {
     if (!deletingOp) return;
     try {
@@ -152,7 +176,6 @@ export default function Home() {
     }
   };
 
-  // --- REZERVASYON DÜZENLEME AKIŞI (ONAYA GÖNDER) ---
   const handlePreSaveEdit = () => {
     if (!editingOp || !editForm.time) return;
     setConfirmEditOp(editingOp); 
@@ -172,7 +195,6 @@ export default function Home() {
     }
   };
 
-  // --- YENİ REZERVASYON OLUŞTURMA AKIŞI ---
   const handleStartReservation = (roomId: string) => {
     setRooms((prev: any[]) => prev.map((r: any) => r.id === roomId ? { ...r, status: 'Rezerve Ediliyor', lockEndTime: Date.now() + 3 * 60 * 1000 } : r));
     setReservingRoomId(roomId); 
@@ -195,7 +217,7 @@ export default function Home() {
       
       if (reservedRoom) {
         setOperations([{ 
-          id: Date.now(), 
+          id: Date.now() + Math.floor(Math.random() * 1000), 
           title: resForm.title || 'Yeni Toplantı', 
           details: `${reservedRoom.name} • ${resForm.time}`, 
           date: formatDateForList(resForm.date), 
@@ -299,13 +321,11 @@ export default function Home() {
               <tbody className="text-gray-700 dark:text-gray-200">
                 {rooms.map((room: any) => {
                   let displayStatus = 'Müsait';
-                  
                   if (room.status === 'Rezerve Ediliyor' && room.lockEndTime && now && now < room.lockEndTime) {
                     displayStatus = 'Rezerve Ediliyor';
                   } else if (isRoomCurrentlyOccupied(room.name)) {
-                    displayStatus = 'Dolu'; // ODA O AN DOLUYSA DOLU YAZAR
+                    displayStatus = 'Dolu';
                   }
-                  
                   const isAvailable = displayStatus === 'Müsait';
                   const isOccupied = displayStatus === 'Dolu';
                   
@@ -325,7 +345,6 @@ export default function Home() {
                         </span>
                       </td>
                       <td className="px-4 py-3 md:px-5 md:py-4 text-right border border-gray-200 dark:border-[#2d2d2d]">
-                        {/* ODA DOLUYSA REZERVASYON YAP BUTONU DEVRE DIŞI BIRAKILIR */}
                         <button disabled={!isAvailable} onClick={() => handleStartReservation(room.id)} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors whitespace-nowrap ${isAvailable ? 'text-white bg-[#E4032C] hover:bg-red-700' : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#2a2a2a] cursor-not-allowed'}`}>Rezervasyon Yap</button>
                       </td>
                     </tr>
@@ -402,7 +421,7 @@ export default function Home() {
                     const isSelected = resForm.time === slot; 
                     const isOccupied = slotStatusesRes.occupied.includes(slot); 
                     const isReserving = slotStatusesRes.reserving.includes(slot); 
-                    const isPast = checkIsPastSlot(slot, resForm.date); // Geçmiş kontrolü BİTİŞ saatine göre yapılır
+                    const isPast = checkIsPastSlot(slot, resForm.date);
                     
                     const isDisabled = isOccupied || isReserving || isPast;
                     

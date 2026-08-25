@@ -98,7 +98,10 @@ export default function AdminPanelPage() {
     // DIŞ SCROLL KALDIRILDI: h-full ve overflow-hidden eklendi. Listelerin içi scroll edilecek.
     <div className="w-full flex flex-col gap-5 h-full max-w-[1400px] mx-auto overflow-hidden">
       
-     
+      <div className="shrink-0 pt-2">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Yönetici Paneli</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm md:text-base">Sistem ayarlarını, toplantı odalarını ve rezervasyonları buradan yönetebilirsiniz.</p>
+      </div>
 
       {/* SEKME MENÜSÜ */}
       <div className="flex border-b border-gray-200 dark:border-[#2d2d2d] shrink-0 gap-6 overflow-x-auto hide-scrollbar">
