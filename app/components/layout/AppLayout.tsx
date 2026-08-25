@@ -60,9 +60,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* FLOATING ACTION BUTTON (SAĞ ALT KÖŞE) */}
+      {/* FLOATING ACTION BUTTON (SAĞ ALT KÖŞE) - DOĞRUDAN TAKVİME YÖNLENDİRİR */}
       <Link
-        href="/new-reservation" // Eğer senin URL'in "/yeni-rezervasyon" ise burayı değiştir
+        href="/calendar" 
         className="
           fixed bottom-6 right-6 z-[99999] 
           flex items-center justify-center gap-2 
