@@ -71,6 +71,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 <div className="p-4 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] flex flex-col items-start">
                   <span className="text-sm font-bold text-gray-900 dark:text-white truncate w-full">{mounted ? user.fullName : 'Yükleniyor...'}</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate w-full">{mounted ? user.email : ''}</span>
+                  
+                  {/* KULLANICI ADI BÖLÜMÜ (Eğer username varsa gösterilir) */}
+                  {mounted && user.username && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-medium truncate w-full">
+                      @{user.username}
+                    </span>
+                  )}
+                  
                   <span className="mt-2 text-[10px] font-bold tracking-wider bg-[#E4032C] text-white px-2 py-0.5 rounded-full uppercase">{mounted ? user.role : 'Admin'}</span>
                 </div>
                 
@@ -79,7 +87,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     <span className="material-symbols-outlined text-[20px]">manage_accounts</span>Profil Ayarları
                   </Link>
                   
-                  {/* YÖNETİCİ PANELİ BUTONU - Sadece Adminlere Görünür */}
                   {mounted && user.role.toLowerCase() === 'admin' && (
                     <Link href="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] flex items-center gap-3">
                       <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>Yönetici Paneli
