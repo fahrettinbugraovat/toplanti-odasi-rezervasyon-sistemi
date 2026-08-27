@@ -24,8 +24,8 @@ export interface Operation {
   title: string;
   details: string;
   date: string;
-  status?: 'aktif' | 'iptal' | 'bekliyor'; // Yeni Statüler
-  pendingChanges?: { // Düzenleme talebi için geçici depo
+  status?: 'aktif' | 'iptal' | 'bekliyor'; 
+  pendingChanges?: { 
     details: string;
     date: string;
   };
@@ -48,7 +48,6 @@ interface ReservationContextProps {
   setPendingSelection: (selection: PendingSelection | null) => void;
   pendingTitle: string;
   setPendingTitle: (title: string) => void;
-  // Yeni Fonksiyonlar
   requestOperationEdit: (id: number, newDetails: string, newDate: string) => void;
   approveOperationEdit: (id: number) => void;
   rejectOperationEdit: (id: number) => void;
@@ -57,94 +56,89 @@ interface ReservationContextProps {
 
 const ReservationContext = createContext<ReservationContextProps | undefined>(undefined);
 
-// BAŞLANGIÇ VERİSİ
-const initialRooms: Room[] = [
-  { id: '1', name: 'Boardroom Alpha', capacity: '12 Kişi', features: ['TV', 'Beyaz Tahta', 'Kamera'], status: 'Müsait', lockEndTime: null },
-  { id: '2', name: 'Huddle Room 1', capacity: '4 Kişi', features: ['TV'], status: 'Müsait', lockEndTime: null },
-  { id: '3', name: 'Creative Space', capacity: '8 Kişi', features: ['Beyaz Tahta', 'Projeksiyon'], status: 'Müsait', lockEndTime: null },
-];
+// SAHTE ODALAR SİLİNDİ (DB KULLANILACAK)
 
-const initialOperations: Operation[] = [
-  { id: 1, title: 'Proje Değerlendirmesi', details: 'Boardroom Alpha • 10:00 - 12:00', date: 'Bugün', status: 'aktif' },
-  { id: 2, title: 'Tasarım İncelemesi', details: 'Boardroom Alpha • 14:00 - 16:00', date: 'Bugün', status: 'aktif' },
-];
+// 1970 YILI HATASINA SEBEP OLAN ANTİK TOPLANTILAR SİLİNDİ :)
+const initialOperations: Operation[] = [];
 
 export const ReservationProvider = ({ children }: { children: ReactNode }) => {
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]); // Başlangıçta boş, API'den dolacak
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [pendingTitle, setPendingTitle] = useState('');
   const [mounted, setMounted] = useState(false);
 
+  // SİSTEM YÜKLENDİĞİNDE ÇALIŞACAK
   useEffect(() => {
-    const savedRooms = localStorage.getItem('roomsData');
+    // 1. İşlemleri (Operasyonları) LocalStorage'dan çek
     const savedOperations = localStorage.getItem('operationsData');
-
-    if (savedRooms) setRooms(JSON.parse(savedRooms));
-    else setRooms(initialRooms);
-
     if (savedOperations) setOperations(JSON.parse(savedOperations));
     else setOperations(initialOperations);
 
+    // 2. ODALARI GERÇEK VERİTABANINDAN ÇEK (Single Source of Truth)
+    const fetchRooms = async () => {
+      try {
+        const response = await fetch('/api/meeting-rooms');
+        if (response.ok) {
+          const data = await response.json();
+          // DB'den gelen odalara Arayüz (UI) için default statüler ekliyoruz
+          const formattedRooms = data.map((room: any) => ({
+            ...room,
+            status: room.status || 'Müsait',
+            lockEndTime: room.lockEndTime || null
+          }));
+          setRooms(formattedRooms);
+        }
+      } catch (error) {
+        console.error("Odalar veritabanından çekilirken hata oluştu:", error);
+      }
+    };
+
+    fetchRooms();
     setMounted(true);
   }, []);
 
+  // ODALARI ARTIK LOCALSTORAGE'A KAYDETMİYORUZ ÇÜNKÜ PATRON VERİTABANI
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem('roomsData', JSON.stringify(rooms));
       localStorage.setItem('operationsData', JSON.stringify(operations));
     }
-  }, [rooms, operations, mounted]);
+  }, [operations, mounted]);
 
-  // --- YENİ İŞ AKIŞI FONKSİYONLARI ---
-
-  // 1. İptal Et (Siler gibi yapıp statüyü iptal'e çekeriz)
+  // --- İŞ AKIŞI FONKSİYONLARI (Hiç dokunulmadı) ---
   const cancelOperation = (id: number) => {
     setOperations(prev => prev.map(op => op.id === id ? { ...op, status: 'iptal' } : op));
   };
 
-  // 2. Düzenleme Talebi Gönder (Mevcudu bozmadan beklemeye alır)
   const requestOperationEdit = (id: number, newDetails: string, newDate: string) => {
     setOperations(prev => prev.map(op => 
-      op.id === id 
-        ? { ...op, status: 'bekliyor', pendingChanges: { details: newDetails, date: newDate } } 
-        : op
+      op.id === id ? { ...op, status: 'bekliyor', pendingChanges: { details: newDetails, date: newDate } } : op
     ));
   };
 
-  // 3. Talebi Onayla (Değişiklikleri kalıcı yapar, statüyü aktife çeker)
   const approveOperationEdit = (id: number) => {
     setOperations(prev => prev.map(op => {
       if (op.id === id && op.pendingChanges) {
         return { 
-          ...op, 
-          details: op.pendingChanges.details, 
-          date: op.pendingChanges.date, 
-          status: 'aktif', 
-          pendingChanges: undefined 
+          ...op, details: op.pendingChanges.details, date: op.pendingChanges.date, 
+          status: 'aktif', pendingChanges: undefined 
         };
       }
       return op;
     }));
   };
 
-  // 4. Talebi Reddet (Bekleyen değişiklikleri siler, eski haline döndürür)
   const rejectOperationEdit = (id: number) => {
     setOperations(prev => prev.map(op => 
-      op.id === id 
-        ? { ...op, status: 'aktif', pendingChanges: undefined } 
-        : op
+      op.id === id ? { ...op, status: 'aktif', pendingChanges: undefined } : op
     ));
   };
 
   return (
     <ReservationContext.Provider value={{ 
-      rooms, setRooms, 
-      reservations, setReservations, 
-      operations, setOperations,
-      pendingSelection, setPendingSelection,
-      pendingTitle, setPendingTitle,
+      rooms, setRooms, reservations, setReservations, operations, setOperations,
+      pendingSelection, setPendingSelection, pendingTitle, setPendingTitle,
       requestOperationEdit, approveOperationEdit, rejectOperationEdit, cancelOperation
     }}>
       {children}

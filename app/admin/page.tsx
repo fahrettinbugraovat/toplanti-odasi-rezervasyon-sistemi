@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 export default function AdminPanelPage() {
   const router = useRouter();
   const { user, mounted } = useUser();
+  // GERİ GELDİ! Artık odaları merkezden (Context'ten) çekiyoruz.
   const { 
     rooms, setRooms, 
     operations, setOperations,
@@ -18,17 +19,14 @@ export default function AdminPanelPage() {
 
   const [activeTab, setActiveTab] = useState<'ozet' | 'odalar' | 'rezervasyonlar' | 'onaylar'>('ozet');
   
-  // YENİ: Oda ekleme/düzenleme için form state'i ve düzenleme modu
   const [roomForm, setRoomForm] = useState({ name: '', capacity: '', features: '' });
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
-  const [deletingRoom, setDeletingRoom] = useState<any>(null); // Silme onayı için
-
-  // YENİ: Anlık saat durumu (Geçmiş rezervasyonları tespit etmek için)
+  const [deletingRoom, setDeletingRoom] = useState<any>(null); 
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
     setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 60000); // Her dakikada bir kontrol eder
+    const timer = setInterval(() => setNow(Date.now()), 60000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -92,7 +90,6 @@ export default function AdminPanelPage() {
     return false;
   };
 
-  // --- DİNAMİK VERİ FİLTRELEME ---
   const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor' && !isMeetingCompleted(op));
   const cancelledOperations = operations.filter((op: any) => op.status === 'iptal');
   const pendingOperations = operations.filter((op: any) => op.status === 'bekliyor');
@@ -110,8 +107,8 @@ export default function AdminPanelPage() {
     return b.id - a.id; 
   });
 
-  // --- ODA YÖNETİMİ: EKLEME VE GÜNCELLEME ---
-  const handleSaveRoom = () => {
+  // --- 3. ODA EKLEME API ENTEGRASYONU ---
+  const handleSaveRoom = async () => {
     if (!roomForm.name.trim() || !roomForm.capacity.trim() || !roomForm.features.trim()) {
       showToast({ type: 'error', title: 'Eksik Bilgi', message: 'Lütfen tüm oda bilgilerini doldurun.' });
       return;
@@ -121,49 +118,48 @@ export default function AdminPanelPage() {
       return;
     }
 
+    const featuresArray = roomForm.features.split(',').map(f => f.trim()).filter(f => f !== '');
+
+    if (editingRoomId) {
+      // DÜZENLEME KISMI
+      showToast({ type: 'error', title: 'Hazırlanıyor', message: 'Oda düzenleme altyapısı bir sonraki adımda eklenecek!' });
+      return;
+    } 
+
+    // YENİ ODA EKLEME (Gerçek API İsteği)
     try {
-      const featuresArray = roomForm.features.split(',').map(f => f.trim()).filter(f => f !== '');
-      
-      if (editingRoomId) {
-        // GÜNCELLEME İŞLEMİ
-        const updatedRooms = rooms.map(r => r.id === editingRoomId ? {
-          ...r,
+      const response = await fetch('/api/meeting-rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: roomForm.name.trim(),
           capacity: `${roomForm.capacity.trim()} Kişi`,
           features: featuresArray
-        } : r);
-        setRooms(updatedRooms);
-        setEditingRoomId(null);
-        showToast({ type: 'success', title: 'Oda Güncellendi', message: 'Toplantı odası bilgileri başarıyla güncellendi.' });
-      } else {
-        // YENİ EKLEME İŞLEMİ
-        const addedRoom = {
-          id: Date.now().toString(),
-          name: roomForm.name.trim(),
-          capacity: `${roomForm.capacity.trim()} Kişi`,
-          features: featuresArray,
-          status: 'Müsait' as 'Müsait',
-          lockEndTime: null
-        };
-        setRooms([...rooms, addedRoom]); 
-        showToast({ type: 'success', title: 'Oda Eklendi', message: 'Toplantı odası başarıyla sisteme eklendi.' });
-      }
+        })
+      });
+
+      if (!response.ok) throw new Error('Veritabanına kaydedilemedi');
+
+      const newRoom = await response.json();
       
+      // MERKEZİ STATE'E (Context'e) ANINDA EKLİYORUZ!
+      // Bu sayede Takvim, Panel Özeti, Arama Çubuğu hepsi anında güncelleniyor.
+      setRooms([{ ...newRoom, status: 'Müsait', lockEndTime: null }, ...rooms]); 
       setRoomForm({ name: '', capacity: '', features: '' }); 
+      showToast({ type: 'success', title: 'Oda Eklendi', message: 'Oda veritabanına başarıyla kaydedildi.' });
+
     } catch (error) {
       showToast({ type: 'error', title: 'İşlem Başarısız', message: 'Oda kaydedilirken bir hata oluştu.' });
     }
   };
 
-  // Düzenle Butonuna Tıklanınca Formu Doldurur
   const handleEditRoomClick = (room: any) => {
     setEditingRoomId(room.id);
     setRoomForm({
       name: room.name,
       capacity: room.capacity.replace(' Kişi', '').trim(),
-      features: room.features.join(', ')
+      features: room.features?.join(', ') || ''
     });
-    // Form kısmına yumuşak geçiş yapmak (scroll) istenirse eklenebilir, şimdilik yan yana oldukları için direkt dolacak.
   };
 
   const handleCancelRoomEdit = () => {
@@ -171,27 +167,20 @@ export default function AdminPanelPage() {
     setRoomForm({ name: '', capacity: '', features: '' });
   };
 
-  // --- ODA SİLME İŞLEMİ ---
+  // --- 4. ODA SİLME (Hazırlık) ---
   const handleConfirmDeleteRoom = () => {
     if (!deletingRoom) return;
-    setRooms(rooms.filter(r => r.id !== deletingRoom.id));
+    
+    // SİLME KISMI
+    showToast({ type: 'error', title: 'Hazırlanıyor', message: 'Oda silme altyapısı bir sonraki adımda eklenecek!' });
     setDeletingRoom(null);
-    
-    // Eğer sildiğimiz odayı tam o an düzenliyorsak formu da sıfırla
-    if (editingRoomId === deletingRoom.id) {
-      handleCancelRoomEdit();
-    }
-    
-    showToast({ type: 'success', title: 'Oda Silindi', message: 'Toplantı odası sistemden tamamen kaldırıldı.' });
   };
 
-  // --- REZERVASYON İPTAL İŞLEMİ ---
   const handleCancelReservation = (id: number) => {
     cancelOperation(id);
     showToast({ type: 'success', title: 'Rezervasyon İptal Edildi', message: 'Rezervasyon başarıyla iptal edildi ve geçmişe taşındı.' });
   };
 
-  // --- ONAY VE RED İŞLEMLERİ ---
   const handleApprove = (id: number) => {
     approveOperationEdit(id);
     showToast({ type: 'success', title: 'Değişiklik Onaylandı', message: 'Rezervasyon değişikliği başarıyla uygulandı.' });
@@ -383,13 +372,12 @@ export default function AdminPanelPage() {
                   <div key={room.id} className={`flex justify-between items-center p-4 border-b border-gray-100 dark:border-[#2d2d2d] last:border-0 transition-colors rounded ${editingRoomId === room.id ? 'bg-red-50 dark:bg-red-900/10 border-l-4 border-l-[#E4032C]' : 'hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'}`}>
                     <div>
                       <p className="font-bold text-sm text-gray-900 dark:text-white">{room.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{room.capacity} • {room.features.join(', ')}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{room.capacity} • {room.features?.join(', ')}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded mr-2 hidden sm:block ${room.status === 'Müsait' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-500' : 'bg-gray-100 text-gray-600 dark:bg-[#333] dark:text-gray-400'}`}>
                         Sistemde
                       </span>
-                      {/* DÜZENLE VE SİL BUTONLARI EKLENDİ */}
                       <button onClick={() => handleEditRoomClick(room)} title="Düzenle" className="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded hover:bg-gray-200 dark:hover:bg-[#333]">
                         <span className="material-symbols-outlined text-[20px]">edit</span>
                       </button>
