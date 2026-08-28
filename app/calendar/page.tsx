@@ -168,24 +168,47 @@ export default function CalendarView() {
     return `${start} - ${end}`;
   };
 
-  const confirmReservation = () => {
+  // YENİ: VERİTABANI BAĞLANTILI REZERVASYON FONKSİYONU
+  const confirmReservation = async () => {
     if (!localSelection || !selectedDate || !localTitle.trim()) return;
+    
     try {
-      const timeString = formatSelectedSlotsString(localSelection.slots);
-      const formattedDate = formatDateForList(getLocalYYYYMMDD(selectedDate));
+      const timeString = formatSelectedSlotsString(localSelection.slots); // Örn: "10:00 - 11:00"
+      const [startStr, endStr] = timeString.split(' - ');
       
-      setOperations([{
-        id: Date.now() + Math.floor(Math.random() * 1000), 
-        title: localTitle.trim(),
-        details: `${localSelection.room.name} • ${timeString}`,
-        date: formattedDate,
-        status: 'aktif'
-      }, ...operations]);
+      // Seçilen tarihi (selectedDate) bozmadan saatlerini ayarlıyoruz
+      const startDate = new Date(selectedDate);
+      startDate.setHours(parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0, 0);
+      
+      const endDate = new Date(selectedDate);
+      endDate.setHours(parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0, 0);
 
-      clearSelection();
-      showToast({ type: 'success', title: 'Rezervasyon Tamamlandı', message: 'Rezervasyon başarıyla oluşturuldu ve tüm sisteme yansıdı.' });
+      // API'ye (Garsona) Veriyi Gönder (POST)
+      const response = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: localTitle.trim(),
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
+          roomId: localSelection.room.id,
+          userId: "test-user-id-1234" // Sabit test kullanıcımız (LDAP gelene kadar)
+        })
+      });
+
+      if (response.ok) {
+        clearSelection();
+        showToast({ type: 'success', title: 'Rezervasyon Tamamlandı', message: 'Rezervasyon başarıyla oluşturuldu ve tüm sisteme yansıdı.' });
+        
+        // Veritabanındaki güncel durumu çekmesi için sayfayı yenile
+        window.location.reload(); 
+      } else {
+        const errorData = await response.json();
+        showToast({ type: 'error', title: 'Hata', message: errorData.error || 'Rezervasyon kaydedilemedi.' });
+      }
     } catch (error) {
-      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'Hata oluştu.' });
+      console.error("Rezervasyon eklenirken hata:", error);
+      showToast({ type: 'error', title: 'Bağlantı Hatası', message: 'Sunucuyla iletişim kurulamadı.' });
     }
   };
 

@@ -120,12 +120,28 @@ export default function MyMeetingsPage() {
     }
   };
 
-  const handleCancel = async (id: number) => {
+  // KURUMSAL İPTAL (SOFT DELETE): Durumu PATCH ile CANCELLED yapıyor
+  const handleCancel = async (id: string) => {
     try {
-      cancelOperation(id);
-      showToast({ type: 'success', title: 'Rezervasyon İptal Edildi', message: 'Rezervasyon başarıyla iptal edildi.' });
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: id, 
+          status: 'CANCELLED' 
+        })
+      });
+
+      if (response.ok) {
+        cancelOperation(id);
+        showToast({ type: 'success', title: 'İptal Edildi', message: 'Rezervasyon iptal edilerek geçmişe taşındı.' });
+        window.location.reload(); 
+      } else {
+        showToast({ type: 'error', title: 'Hata', message: 'İptal işlemi veritabanında başarısız oldu.' });
+      }
     } catch (error) {
-      showToast({ type: 'error', title: 'İşlem Başarısız', message: 'İşlem gerçekleştirilemedi.' });
+      console.error("İptal hatası:", error);
+      showToast({ type: 'error', title: 'Bağlantı Hatası', message: 'Sunucuya ulaşılamadı.' });
     }
   };
 
@@ -161,7 +177,6 @@ export default function MyMeetingsPage() {
 
   return (
     <div className="w-full flex flex-col h-full gap-6 relative">
-      
       
       <div className="flex border-b border-gray-200 dark:border-[#2d2d2d] shrink-0 gap-6">
         <button onClick={() => setActiveTab('gelecek')} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'gelecek' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>

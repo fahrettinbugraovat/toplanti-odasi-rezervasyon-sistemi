@@ -28,7 +28,6 @@ export default function Home() {
     return `${d.getDate()} ${months[d.getMonth()]}`;
   };
 
-  // YENİ: Toplantının saatinin (veya gününün) geçip geçmediğini milisaniyesine kadar kontrol eder
   const isMeetingCompleted = (op: any) => {
     if (!now) return false;
     const currentYear = new Date(now).getFullYear();
@@ -53,10 +52,9 @@ export default function Home() {
        }
     }
 
-    if (parsedDate < todayStrLocal) return true; // Geçmiş gün
-    if (parsedDate > todayStrLocal) return false; // Gelecek gün
+    if (parsedDate < todayStrLocal) return true; 
+    if (parsedDate > todayStrLocal) return false; 
     
-    // Aynı günse, bitiş saatinin geçip geçmediğine bakar
     const detailsParts = (op.details || '').split(' • ');
     if (detailsParts.length >= 2) {
        const timeStr = detailsParts[1].trim();
@@ -73,9 +71,23 @@ export default function Home() {
     return false;
   };
 
-  // Tamamlanan toplantılar aktif sayılmaz
   const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor' && !isMeetingCompleted(op));
-  const sortedLogOperations = [...operations].sort((a: any, b: any) => b.id - a.id);
+  
+  // YENİ: Sadece sistemin güncel tarihinde (Bugün) oluşturulan kayıtları "Son İşlemler" paneline al
+  const sortedLogOperations = [...operations]
+    .filter((op: any) => {
+      if (!now || !op.createdAt) return true; // Güvenlik kontrolü
+      const todayString = getLocalYYYYMMDD(new Date(now));
+      const opCreateDateString = getLocalYYYYMMDD(new Date(op.createdAt));
+      
+      // Kayıt tarihi bugün olanlar gösterilecek, geçmiş günlerde kalanlar ekrandan gizlenecek (DB'de duruyor)
+      return todayString === opCreateDateString;
+    })
+    .sort((a: any, b: any) => {
+      if (a.id < b.id) return 1;
+      if (a.id > b.id) return -1;
+      return 0;
+    });
 
   const getAllBlocks = () => {
     const blocks: any[] = [];
@@ -208,11 +220,31 @@ export default function Home() {
     return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, [instantResRoom]);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingOp) return;
-    cancelOperation(deletingOp.id);
-    setDeletingOp(null);
-    showToast({ type: 'success', title: 'Rezervasyon İptal Edildi', message: 'Rezervasyon başarıyla iptal edildi.' });
+
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: deletingOp.id, 
+          status: 'CANCELLED' 
+        })
+      });
+
+      if (response.ok) {
+        cancelOperation(deletingOp.id);
+        setDeletingOp(null);
+        showToast({ type: 'success', title: 'İptal Edildi', message: 'Rezervasyon iptal edilerek geçmişe taşındı.' });
+        window.location.reload(); 
+      } else {
+        showToast({ type: 'error', title: 'Hata', message: 'İptal işlemi veritabanında başarısız oldu.' });
+      }
+    } catch (error) {
+      console.error("İptal hatası:", error);
+      showToast({ type: 'error', title: 'Bağlantı Hatası', message: 'Sunucuya ulaşılamadı.' });
+    }
   };
 
   const handlePreSaveEdit = () => {
@@ -243,7 +275,7 @@ export default function Home() {
     setInstantResRoom(null);
   };
 
-  const handleConfirmInstantReservation = () => {
+  const handleConfirmInstantReservation = async () => {
     if (!instantResRoom) return;
     const slot = getCurrentSlot();
     
@@ -254,31 +286,51 @@ export default function Home() {
 
     const finalTitle = instantResTitle.trim() || 'Hızlı Toplantı';
 
-    setRooms((prev: any[]) => prev.map((r: any) => r.id === instantResRoom.id ? { ...r, status: 'Müsait', lockEndTime: null } : r));
+    const [startStr, endStr] = slot.split(' - ');
+    const todayDate = new Date();
+    const startDate = new Date(todayDate.setHours(parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0, 0));
+    const endDate = new Date(todayDate.setHours(parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0, 0));
 
-    setOperations([{ 
-      id: Date.now() + Math.floor(Math.random() * 1000), 
-      title: finalTitle, 
-      details: `${instantResRoom.name} • ${slot}`, 
-      date: formatDateForList(todayStr), 
-      status: 'aktif' 
-    }, ...operations]);
-    
-    setInstantResRoom(null);
-    setInstantResTitle('');
-    showToast({ type: 'success', title: 'Rezervasyon Tamamlandı', message: 'Oda şu anki saat dilimi için başarıyla rezerve edildi.' });
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: finalTitle,
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
+          roomId: instantResRoom.id,
+          userId: "test-user-id-1234" 
+        })
+      });
+
+      if (response.ok) {
+        setRooms((prev: any[]) => prev.map((r: any) => r.id === instantResRoom.id ? { ...r, status: 'Müsait', lockEndTime: null } : r));
+        setInstantResRoom(null);
+        setInstantResTitle('');
+        showToast({ type: 'success', title: 'Rezervasyon Tamamlandı', message: 'Oda şu anki saat dilimi için başarıyla rezerve edildi.' });
+        window.location.reload(); 
+      } else {
+        const errorData = await response.json();
+        showToast({ type: 'error', title: 'Kayıt Başarısız', message: errorData.error || 'Veritabanına kaydedilemedi.' });
+      }
+    } catch (error) {
+      console.error("Rezervasyon eklenirken hata:", error);
+      showToast({ type: 'error', title: 'Bağlantı Hatası', message: 'Sunucuya ulaşılamadı.' });
+    }
   };
 
-  const getTimeAgo = (timestamp: number) => {
-    if (!now || !timestamp) return "Az önce";
+  const getTimeAgo = (createdAtStr?: string) => {
+    if (!now || !createdAtStr) return "Az önce";
+    const timestamp = new Date(createdAtStr).getTime();
     const diffMins = Math.floor((now - timestamp) / 60000);
-    if (diffMins < 1) return "Az önce";
+    
+    if (isNaN(diffMins) || diffMins < 1) return "Az önce";
     if (diffMins < 60) return `${diffMins} dk önce`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)} saat önce`;
     return `${Math.floor(diffMins / 1440)} gün önce`;
   };
 
-  // YENİ: Toplantıların durumlarına göre rozetleri, emojileri ve başlıkları belirler
   const getActionDetails = (op: any) => {
     const isCompleted = isMeetingCompleted(op);
     let actionText = "Rezervasyon oluşturuldu / onaylandı";
@@ -433,23 +485,25 @@ export default function Home() {
             {sortedLogOperations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 space-y-2 pt-8">
                 <span className="material-symbols-outlined text-4xl opacity-50">history</span>
-                <p className="text-xs font-semibold">Henüz işlem bulunmuyor</p>
+                <p className="text-xs font-semibold">Bugün işlem bulunmuyor</p>
               </div>
             ) : (
               sortedLogOperations.map((op: any) => {
                 const { actionText, icon, displayDetails, isCompleted } = getActionDetails(op);
-                const timeAgo = getTimeAgo(op.id);
-                // DÜZELTME: Tamamlanan veya iptal edilen toplantılar düzenlenemez
+                const timeAgo = getTimeAgo(op.createdAt);
                 const canEdit = op.status !== 'iptal' && !isCompleted; 
+                
+                // YENİ: İptal edilmişse veya zamanı geçmişse soluk ve çizili göster
+                const isFaded = isCompleted || op.status === 'iptal';
 
                 return (
-                  <div key={op.id} className={`flex flex-col gap-2 p-3 md:p-4 bg-white dark:bg-[#1c1c1c] rounded-lg border border-gray-200 dark:border-[#3d3d3d] transition-colors ${isCompleted ? 'opacity-80' : 'hover:border-gray-300 dark:hover:border-[#4d4d4d]'}`}>
+                  <div key={op.id} className={`flex flex-col gap-2 p-3 md:p-4 bg-white dark:bg-[#1c1c1c] rounded-lg border border-gray-200 dark:border-[#3d3d3d] transition-colors ${isFaded ? 'opacity-60' : 'hover:border-gray-300 dark:hover:border-[#4d4d4d]'}`}>
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className={`font-bold text-sm flex items-center gap-1.5 ${isCompleted ? 'text-gray-600 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                        <p className={`font-bold text-sm flex items-center gap-1.5 ${isFaded ? 'text-gray-500 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                           <span>{icon}</span> {actionText}
                         </p>
-                        <p className={`text-xs mt-1.5 font-medium ${isCompleted ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-500 dark:text-gray-400'}`}>{displayDetails}</p>
+                        <p className={`text-xs mt-1.5 font-medium ${isFaded ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-500 dark:text-gray-400'}`}>{displayDetails}</p>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 whitespace-nowrap">
                         {timeAgo}
@@ -625,7 +679,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </div>  
       )}
     </div>
   );

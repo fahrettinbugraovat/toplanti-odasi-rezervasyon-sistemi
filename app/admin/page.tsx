@@ -9,7 +9,6 @@ import { useToast } from '../context/ToastContext';
 export default function AdminPanelPage() {
   const router = useRouter();
   const { user, mounted } = useUser();
-  // GERİ GELDİ! Artık odaları merkezden (Context'ten) çekiyoruz.
   const { 
     rooms, setRooms, 
     operations, setOperations,
@@ -104,10 +103,10 @@ export default function AdminPanelPage() {
     const weightA = getStatusWeight(a);
     const weightB = getStatusWeight(b);
     if (weightA !== weightB) return weightA - weightB;
-    return b.id - a.id; 
+    return b.id < a.id ? -1 : 1; 
   });
 
-  // --- 3. ODA EKLEME API ENTEGRASYONU ---
+  // --- ODA EKLEME API ENTEGRASYONU ---
   const handleSaveRoom = async () => {
     if (!roomForm.name.trim() || !roomForm.capacity.trim() || !roomForm.features.trim()) {
       showToast({ type: 'error', title: 'Eksik Bilgi', message: 'Lütfen tüm oda bilgilerini doldurun.' });
@@ -121,12 +120,10 @@ export default function AdminPanelPage() {
     const featuresArray = roomForm.features.split(',').map(f => f.trim()).filter(f => f !== '');
 
     if (editingRoomId) {
-      // DÜZENLEME KISMI
       showToast({ type: 'error', title: 'Hazırlanıyor', message: 'Oda düzenleme altyapısı bir sonraki adımda eklenecek!' });
       return;
     } 
 
-    // YENİ ODA EKLEME (Gerçek API İsteği)
     try {
       const response = await fetch('/api/meeting-rooms', {
         method: 'POST',
@@ -142,8 +139,6 @@ export default function AdminPanelPage() {
 
       const newRoom = await response.json();
       
-      // MERKEZİ STATE'E (Context'e) ANINDA EKLİYORUZ!
-      // Bu sayede Takvim, Panel Özeti, Arama Çubuğu hepsi anında güncelleniyor.
       setRooms([{ ...newRoom, status: 'Müsait', lockEndTime: null }, ...rooms]); 
       setRoomForm({ name: '', capacity: '', features: '' }); 
       showToast({ type: 'success', title: 'Oda Eklendi', message: 'Oda veritabanına başarıyla kaydedildi.' });
@@ -167,26 +162,44 @@ export default function AdminPanelPage() {
     setRoomForm({ name: '', capacity: '', features: '' });
   };
 
-  // --- 4. ODA SİLME (Hazırlık) ---
   const handleConfirmDeleteRoom = () => {
     if (!deletingRoom) return;
     
-    // SİLME KISMI
     showToast({ type: 'error', title: 'Hazırlanıyor', message: 'Oda silme altyapısı bir sonraki adımda eklenecek!' });
     setDeletingRoom(null);
   };
 
-  const handleCancelReservation = (id: number) => {
-    cancelOperation(id);
-    showToast({ type: 'success', title: 'Rezervasyon İptal Edildi', message: 'Rezervasyon başarıyla iptal edildi ve geçmişe taşındı.' });
+  // KURUMSAL İPTAL (SOFT DELETE): Durumu PATCH ile CANCELLED yapıyor
+  const handleCancelReservation = async (id: string) => {
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: id, 
+          status: 'CANCELLED' 
+        })
+      });
+
+      if (response.ok) {
+        cancelOperation(id);
+        showToast({ type: 'success', title: 'İptal Edildi', message: 'Rezervasyon başarıyla iptal edildi.' });
+        window.location.reload(); 
+      } else {
+        showToast({ type: 'error', title: 'Hata', message: 'İptal işlemi başarısız oldu.' });
+      }
+    } catch (error) {
+      console.error("İptal hatası:", error);
+      showToast({ type: 'error', title: 'Bağlantı Hatası', message: 'Sunucuya ulaşılamadı.' });
+    }
   };
 
-  const handleApprove = (id: number) => {
+  const handleApprove = (id: string) => {
     approveOperationEdit(id);
     showToast({ type: 'success', title: 'Değişiklik Onaylandı', message: 'Rezervasyon değişikliği başarıyla uygulandı.' });
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = (id: string) => {
     rejectOperationEdit(id);
     showToast({ type: 'success', title: 'Değişiklik Reddedildi', message: 'Rezervasyon değişikliği reddedildi, mevcut kayıt korundu.' });
   };

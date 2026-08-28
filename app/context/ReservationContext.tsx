@@ -11,7 +11,7 @@ export interface Room {
 }
 
 export interface Reservation {
-  id: number;
+  id: string; 
   roomId: string;
   start: number;
   end: number;
@@ -20,7 +20,7 @@ export interface Reservation {
 }
 
 export interface Operation {
-  id: number;
+  id: string; 
   title: string;
   details: string;
   date: string;
@@ -29,6 +29,7 @@ export interface Operation {
     details: string;
     date: string;
   };
+  createdAt?: string; // YENİ: Veritabanındaki kayıt zamanını tutması için eklendi
 }
 
 export interface PendingSelection {
@@ -48,41 +49,28 @@ interface ReservationContextProps {
   setPendingSelection: (selection: PendingSelection | null) => void;
   pendingTitle: string;
   setPendingTitle: (title: string) => void;
-  requestOperationEdit: (id: number, newDetails: string, newDate: string) => void;
-  approveOperationEdit: (id: number) => void;
-  rejectOperationEdit: (id: number) => void;
-  cancelOperation: (id: number) => void;
+  requestOperationEdit: (id: string, newDetails: string, newDate: string) => void;
+  approveOperationEdit: (id: string) => void;
+  rejectOperationEdit: (id: string) => void;
+  cancelOperation: (id: string) => void;
 }
 
 const ReservationContext = createContext<ReservationContextProps | undefined>(undefined);
 
-// SAHTE ODALAR SİLİNDİ (DB KULLANILACAK)
-
-// 1970 YILI HATASINA SEBEP OLAN ANTİK TOPLANTILAR SİLİNDİ :)
-const initialOperations: Operation[] = [];
-
 export const ReservationProvider = ({ children }: { children: ReactNode }) => {
-  const [rooms, setRooms] = useState<Room[]>([]); // Başlangıçta boş, API'den dolacak
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [pendingTitle, setPendingTitle] = useState('');
   const [mounted, setMounted] = useState(false);
 
-  // SİSTEM YÜKLENDİĞİNDE ÇALIŞACAK
   useEffect(() => {
-    // 1. İşlemleri (Operasyonları) LocalStorage'dan çek
-    const savedOperations = localStorage.getItem('operationsData');
-    if (savedOperations) setOperations(JSON.parse(savedOperations));
-    else setOperations(initialOperations);
-
-    // 2. ODALARI GERÇEK VERİTABANINDAN ÇEK (Single Source of Truth)
     const fetchRooms = async () => {
       try {
         const response = await fetch('/api/meeting-rooms');
         if (response.ok) {
           const data = await response.json();
-          // DB'den gelen odalara Arayüz (UI) için default statüler ekliyoruz
           const formattedRooms = data.map((room: any) => ({
             ...room,
             status: room.status || 'Müsait',
@@ -91,33 +79,65 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
           setRooms(formattedRooms);
         }
       } catch (error) {
-        console.error("Odalar veritabanından çekilirken hata oluştu:", error);
+        console.error("Odalar çekilirken hata:", error);
+      }
+    };
+
+    const fetchReservations = async () => {
+      try {
+        const response = await fetch('/api/reservations');
+        if (response.ok) {
+          const dbReservations = await response.json();
+          
+          const formattedOperations: Operation[] = dbReservations.map((res: any) => {
+            const start = new Date(res.startTime);
+            const end = new Date(res.endTime);
+            
+            const startTimeStr = start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            const endTimeStr = end.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            
+            // DÜZELTME 1: Arayüzün beklediği "28 Ağu" formatına çeviriyoruz
+            const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+            const dateStr = `${start.getDate()} ${months[start.getMonth()]}`;
+
+            let opStatus: 'aktif' | 'iptal' | 'bekliyor' = 'aktif';
+            if (res.status === 'CANCELLED') opStatus = 'iptal';
+            if (res.status === 'PENDING') opStatus = 'bekliyor';
+
+            return {
+              id: res.id,
+              title: res.title,
+              details: `${res.room?.name || 'Bilinmeyen Oda'} • ${startTimeStr} - ${endTimeStr}`,
+              date: dateStr,
+              status: opStatus,
+              createdAt: res.createdAt // DÜZELTME 2: Zaman hesaplaması için veritabanı tarihini ekledik
+            };
+          });
+
+          setOperations(formattedOperations);
+          setReservations(dbReservations);
+        }
+      } catch (error) {
+        console.error("Rezervasyonlar çekilirken hata:", error);
       }
     };
 
     fetchRooms();
+    fetchReservations();
     setMounted(true);
   }, []);
 
-  // ODALARI ARTIK LOCALSTORAGE'A KAYDETMİYORUZ ÇÜNKÜ PATRON VERİTABANI
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem('operationsData', JSON.stringify(operations));
-    }
-  }, [operations, mounted]);
-
-  // --- İŞ AKIŞI FONKSİYONLARI (Hiç dokunulmadı) ---
-  const cancelOperation = (id: number) => {
+  const cancelOperation = (id: string) => {
     setOperations(prev => prev.map(op => op.id === id ? { ...op, status: 'iptal' } : op));
   };
 
-  const requestOperationEdit = (id: number, newDetails: string, newDate: string) => {
+  const requestOperationEdit = (id: string, newDetails: string, newDate: string) => {
     setOperations(prev => prev.map(op => 
       op.id === id ? { ...op, status: 'bekliyor', pendingChanges: { details: newDetails, date: newDate } } : op
     ));
   };
 
-  const approveOperationEdit = (id: number) => {
+  const approveOperationEdit = (id: string) => {
     setOperations(prev => prev.map(op => {
       if (op.id === id && op.pendingChanges) {
         return { 
@@ -129,7 +149,7 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const rejectOperationEdit = (id: number) => {
+  const rejectOperationEdit = (id: string) => {
     setOperations(prev => prev.map(op => 
       op.id === id ? { ...op, status: 'aktif', pendingChanges: undefined } : op
     ));
