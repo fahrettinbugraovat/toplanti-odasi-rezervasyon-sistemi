@@ -145,9 +145,10 @@ export default function MyMeetingsPage() {
     }
   };
 
+  // YENİ: tamamlandı durumunu filtreye ekledik. Artık süresi geçenler Gelecek sekmesinde görünmeyecek!
   const displayedOperations = operations.filter((op: any) => {
     if (activeTab === 'iptal') return op.status === 'iptal';
-    if (activeTab === 'gelecek') return op.status !== 'iptal' && !isPastOperationDay(op); 
+    if (activeTab === 'gelecek') return op.status !== 'iptal' && op.status !== 'tamamlandı' && !isPastOperationDay(op); 
     return false; 
   });
 

@@ -24,12 +24,12 @@ export interface Operation {
   title: string;
   details: string;
   date: string;
-  status?: 'aktif' | 'iptal' | 'bekliyor'; 
+  status?: 'aktif' | 'iptal' | 'bekliyor' | 'tamamlandı'; 
   pendingChanges?: { 
     details: string;
     date: string;
   };
-  createdAt?: string; // YENİ: Veritabanındaki kayıt zamanını tutması için eklendi
+  createdAt?: string; 
 }
 
 export interface PendingSelection {
@@ -68,7 +68,8 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const response = await fetch('/api/meeting-rooms');
+        // YENİ EKLENDİ: cache: 'no-store'
+        const response = await fetch('/api/meeting-rooms', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           const formattedRooms = data.map((room: any) => ({
@@ -85,7 +86,8 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchReservations = async () => {
       try {
-        const response = await fetch('/api/reservations');
+        // YENİ EKLENDİ VE KRİTİK: cache: 'no-store'
+        const response = await fetch('/api/reservations', { cache: 'no-store' });
         if (response.ok) {
           const dbReservations = await response.json();
           
@@ -96,13 +98,13 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
             const startTimeStr = start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
             const endTimeStr = end.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
             
-            // DÜZELTME 1: Arayüzün beklediği "28 Ağu" formatına çeviriyoruz
             const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
             const dateStr = `${start.getDate()} ${months[start.getMonth()]}`;
 
-            let opStatus: 'aktif' | 'iptal' | 'bekliyor' = 'aktif';
+            let opStatus: 'aktif' | 'iptal' | 'bekliyor' | 'tamamlandı' = 'aktif';
             if (res.status === 'CANCELLED') opStatus = 'iptal';
             if (res.status === 'PENDING') opStatus = 'bekliyor';
+            if (res.status === 'COMPLETED') opStatus = 'tamamlandı';
 
             return {
               id: res.id,
@@ -110,7 +112,7 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
               details: `${res.room?.name || 'Bilinmeyen Oda'} • ${startTimeStr} - ${endTimeStr}`,
               date: dateStr,
               status: opStatus,
-              createdAt: res.createdAt // DÜZELTME 2: Zaman hesaplaması için veritabanı tarihini ekledik
+              createdAt: res.createdAt 
             };
           });
 

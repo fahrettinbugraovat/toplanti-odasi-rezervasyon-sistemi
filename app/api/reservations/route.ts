@@ -1,12 +1,25 @@
 import { NextResponse } from 'next/server';
-// Not: Eğer '../../lib/prisma' hata verirse, bunu '@/lib/prisma' veya '../../../lib/prisma' olarak değiştirebilirsin.
 import prisma from '../../lib/prisma'; 
 
-// ==========================================
-// 1. TÜM REZERVASYONLARI GETİR (GET İSTEĞİ)
-// ==========================================
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
+    const now = new Date();
+
+    // Süresi dolan aktif rezervasyonları otomatik olarak COMPLETED (Tamamlandı) yap
+    await prisma.reservation.updateMany({
+      where: {
+        status: 'ACTIVE',
+        endTime: {
+          lt: now
+        }
+      },
+      data: {
+        status: 'COMPLETED'
+      }
+    });
+
     const reservations = await prisma.reservation.findMany({
       include: {
         room: true,
@@ -22,20 +35,15 @@ export async function GET() {
   }
 }
 
-// ==========================================
-// 2. YENİ REZERVASYON OLUŞTUR (POST İSTEĞİ)
-// ==========================================
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { title, startTime, endTime, roomId, userId } = body;
 
-    // Basit bir validasyon
     if (!title || !startTime || !endTime || !roomId || !userId) {
       return NextResponse.json({ error: 'Eksik veri gönderdiniz. Lütfen tüm alanları doldurun.' }, { status: 400 });
     }
 
-    // Prisma ile PostgreSQL'e kaydet
     const newReservation = await prisma.reservation.create({
       data: {
         title,
@@ -58,9 +66,6 @@ export async function POST(request: Request) {
   }
 }
 
-// ==========================================
-// 3. REZERVASYON İPTAL ET / GÜNCELLE (PATCH İSTEĞİ)
-// ==========================================
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
@@ -70,7 +75,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'ID ve durum (status) gereklidir.' }, { status: 400 });
     }
 
-    // Prisma ile veritabanındaki kaydın durumunu güncelle
     const updatedReservation = await prisma.reservation.update({
       where: { id: id },
       data: { status: status },
@@ -82,20 +86,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Rezervasyon güncellenirken hata oluştu.' }, { status: 500 });
   }
 }
-// ==========================================
-// 4. REZERVASYONU VERİTABANINDAN TAMAMEN SİL (DELETE İSTEĞİ)
-// ==========================================
+
 export async function DELETE(request: Request) {
   try {
-    // YENİ: Paketten (body) değil, doğrudan URL adresinin sonundan ID'yi alıyoruz!
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (!id) {
       return NextResponse.json({ error: 'Silmek için bir ID gereklidir.' }, { status: 400 });
     }
-
-    // Prisma ile o satırı veritabanından tamamen uçur
+    
     await prisma.reservation.delete({
       where: { id: id }
     });
