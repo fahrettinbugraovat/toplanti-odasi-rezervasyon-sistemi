@@ -38,6 +38,22 @@ export default function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
+  // 1. LOGIN SAYFASINDA HEADER'I GİZLE
+  if (pathname === '/login') return null;
+
+  // 2. ÇIKIŞ YAPMA (LOGOUT) FONKSİYONU
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setIsProfileOpen(false);
+      // Soft navigation yerine tarayıcıyı zorla yenileyerek Login sayfasına gönderiyoruz
+      // (Eski UserContext verilerinin tamamen silinmesi için)
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Çıkış yapılamadı:', error);
+    }
+  };
+
   return (
     <>
       <header className="bg-white dark:bg-[#1c1c1c] border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center h-[72px] px-4 md:px-6 shrink-0 w-full z-50 relative">
@@ -108,9 +124,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </div>
 
                 <div className="py-1 border-t border-gray-200 dark:border-[#2d2d2d]">
-                  <Link href="/" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3">
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3">
                     <span className="material-symbols-outlined text-[20px]">logout</span>Çıkış Yap
-                  </Link>
+                  </button>
                 </div>
               </div>
             )}

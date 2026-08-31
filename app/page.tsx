@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useReservationData } from './context/ReservationContext';
 import { useToast } from './context/ToastContext'; 
+import { useUser } from './context/UserContext'; 
 
 const TIME_SLOTS = ["09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00"];
 
@@ -10,9 +11,19 @@ export default function Home() {
   const router = useRouter(); 
   const { rooms, setRooms, operations, setOperations, requestOperationEdit, cancelOperation } = useReservationData();
   const { showToast } = useToast(); 
+  const { user, mounted: userMounted } = useUser(); 
 
   const [isMounted, setIsMounted] = useState(false);
   const [now, setNow] = useState<number | null>(null);
+
+  const [deletingOp, setDeletingOp] = useState<any>(null);
+  const [editingOp, setEditingOp] = useState<any>(null);
+  const [confirmEditOp, setConfirmEditOp] = useState<any>(null); 
+  const [editForm, setEditForm] = useState({ title: '', room: '', time: '', date: '' });
+  const [originalTime, setOriginalTime] = useState("");
+  
+  const [instantResRoom, setInstantResRoom] = useState<any>(null);
+  const [instantResTitle, setInstantResTitle] = useState('');
 
   const getLocalYYYYMMDD = (date: Date) => {
     const y = date.getFullYear();
@@ -21,6 +32,24 @@ export default function Home() {
     return `${y}-${m}-${d}`;
   };
   const todayStr = getLocalYYYYMMDD(new Date());
+
+  // TARİH & SAAT BİRLEŞİK KONTROL FONKSİYONU
+  const isPastSlotCheck = (dateStr: string, timeStr: string) => {
+    if (!dateStr || !timeStr || !now) return false;
+    const todayStrLocal = getLocalYYYYMMDD(new Date(now));
+    
+    if (dateStr < todayStrLocal) return true; // Geçmiş gün
+    if (dateStr === todayStrLocal) {
+       const startHour = parseInt(timeStr.split(' - ')[0].split(':')[0], 10);
+       const startMin = parseInt(timeStr.split(' - ')[0].split(':')[1], 10);
+       const slotTotalMins = startHour * 60 + startMin;
+       
+       const d = new Date(now);
+       const currentTotalMins = d.getHours() * 60 + d.getMinutes();
+       if (slotTotalMins <= currentTotalMins) return true; 
+    }
+    return false;
+  };
 
   const formatDateForList = (dateString: string) => {
     if (!dateString) return "Belirsiz"; const d = new Date(dateString); if (isNaN(d.getTime())) return "Belirsiz";
@@ -59,13 +88,13 @@ export default function Home() {
     if (detailsParts.length >= 2) {
        const timeStr = detailsParts[1].trim();
        if (timeStr.includes(' - ')) {
-         const endStr = timeStr.split(' - ')[1];
-         const endHour = parseInt(endStr.split(':')[0], 10);
-         const endMin = parseInt(endStr.split(':')[1], 10);
-         const d = new Date(now);
-         const currentMins = d.getHours() * 60 + d.getMinutes();
-         const endMins = endHour * 60 + endMin;
-         return currentMins >= endMins;
+          const endStr = timeStr.split(' - ')[1];
+          const endHour = parseInt(endStr.split(':')[0], 10);
+          const endMin = parseInt(endStr.split(':')[1], 10);
+          const d = new Date(now);
+          const currentMins = d.getHours() * 60 + d.getMinutes();
+          const endMins = endHour * 60 + endMin;
+          return currentMins >= endMins;
        }
     }
     return false;
@@ -73,21 +102,14 @@ export default function Home() {
 
   const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor' && !isMeetingCompleted(op));
   
-  // YENİ: Sadece sistemin güncel tarihinde (Bugün) oluşturulan kayıtları "Son İşlemler" paneline al
   const sortedLogOperations = [...operations]
-    .filter((op: any) => {
-      if (!now || !op.createdAt) return true; // Güvenlik kontrolü
-      const todayString = getLocalYYYYMMDD(new Date(now));
-      const opCreateDateString = getLocalYYYYMMDD(new Date(op.createdAt));
-      
-      // Kayıt tarihi bugün olanlar gösterilecek, geçmiş günlerde kalanlar ekrandan gizlenecek (DB'de duruyor)
-      return todayString === opCreateDateString;
-    })
+    .filter((op: any) => op.status !== 'iptal' && !isMeetingCompleted(op))
     .sort((a: any, b: any) => {
-      if (a.id < b.id) return 1;
-      if (a.id > b.id) return -1;
-      return 0;
-    });
+      const dateA = new Date(a.originalData?.startTime || 0).getTime();
+      const dateB = new Date(b.originalData?.startTime || 0).getTime();
+      return dateA - dateB;
+    })
+    .slice(0, 15); 
 
   const getAllBlocks = () => {
     const blocks: any[] = [];
@@ -167,15 +189,6 @@ export default function Home() {
     return () => { clearInterval(timer); clearInterval(counterTimer); };
   }, [rooms.length, totalReservations, usageRate]);
 
-  const [deletingOp, setDeletingOp] = useState<any>(null);
-  const [editingOp, setEditingOp] = useState<any>(null);
-  const [confirmEditOp, setConfirmEditOp] = useState<any>(null); 
-  const [editForm, setEditForm] = useState({ title: '', room: '', time: '', date: '' });
-  const [originalTime, setOriginalTime] = useState("");
-  
-  const [instantResRoom, setInstantResRoom] = useState<any>(null);
-  const [instantResTitle, setInstantResTitle] = useState('');
-
   useEffect(() => {
     if (!now) return;
     setRooms((prevRooms: any[]) => {
@@ -196,16 +209,25 @@ export default function Home() {
 
   useEffect(() => {
     if (editingOp) {
-      const [room, timeStr] = editingOp.details.split(' • ');
+      const parts = (editingOp.details || '').split(' • ');
+      const room = parts[0] || "";
+      const timeStr = parts[1] || "";
       let parsedDate = todayStr; 
       const today = new Date();
       if (editingOp.date === 'Bugün') parsedDate = todayStr;
       else if (editingOp.date === 'Yarın') { today.setDate(today.getDate() + 1); parsedDate = getLocalYYYYMMDD(today); }
       
-      setEditForm({ title: editingOp.title, room: room || "", time: "", date: parsedDate });
-      setOriginalTime(timeStr || "");
+      setEditForm({ title: editingOp.title || "", room: room, time: timeStr, date: parsedDate });
+      setOriginalTime(timeStr);
     }
   }, [editingOp, todayStr]);
+
+  const handleCancelInstantRes = () => {
+    if (instantResRoom) {
+      setRooms((prev: any[]) => prev.map((r: any) => r.id === instantResRoom.id ? { ...r, status: 'Müsait', lockEndTime: null } : r));
+    }
+    setInstantResRoom(null);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { 
@@ -218,32 +240,17 @@ export default function Home() {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instantResRoom]);
 
   const handleConfirmDelete = async () => {
     if (!deletingOp) return;
-
     try {
-      const response = await fetch('/api/reservations', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: deletingOp.id, 
-          status: 'CANCELLED' 
-        })
-      });
-
-      if (response.ok) {
-        cancelOperation(deletingOp.id);
-        setDeletingOp(null);
-        showToast({ type: 'success', title: 'İptal Edildi', message: 'Rezervasyon iptal edilerek geçmişe taşındı.' });
-        window.location.reload(); 
-      } else {
-        showToast({ type: 'error', title: 'Hata', message: 'İptal işlemi veritabanında başarısız oldu.' });
-      }
-    } catch (error) {
-      console.error("İptal hatası:", error);
-      showToast({ type: 'error', title: 'Bağlantı Hatası', message: 'Sunucuya ulaşılamadı.' });
+      await cancelOperation(deletingOp.id);
+      setDeletingOp(null);
+      showToast({ type: 'success', title: 'İptal Edildi', message: 'Rezervasyon iptal edilerek geçmişe taşındı.' });
+    } catch (error: any) {
+      showToast({ type: 'error', title: 'Hata', message: 'İptal işlemi veritabanında başarısız oldu.' });
     }
   };
 
@@ -253,26 +260,37 @@ export default function Home() {
     setEditingOp(null); 
   };
 
-  const handleSendToApproval = () => {
+  const handleSendToApproval = async () => {
     if (!confirmEditOp) return;
-    const newDetails = `${editForm.room} • ${editForm.time}`;
-    const newDate = formatDateForList(editForm.date);
-    requestOperationEdit(confirmEditOp.id, newDetails, newDate);
-    setConfirmEditOp(null);
-    showToast({ type: 'success', title: 'Onaya Gönderildi', message: 'Rezervasyon değişikliğiniz yönetici onayına gönderildi.' });
+    try {
+      const [startStr, endStr] = editForm.time.split(' - ');
+      const baseDate = editForm.date ? new Date(editForm.date) : new Date();
+      
+      const startTime = new Date(baseDate);
+      startTime.setHours(parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0, 0);
+
+      const endTime = new Date(baseDate);
+      endTime.setHours(parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0, 0);
+
+      await requestOperationEdit(confirmEditOp.id, {
+        title: editForm.title,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString()
+      });
+
+      setConfirmEditOp(null);
+      // BAŞARILI İSE TOAST GÖSTER
+      showToast({ type: 'success', title: 'Onaya Gönderildi', message: 'Değişiklik isteğiniz veritabanına kaydedildi ve onaya sunuldu.' });
+    } catch (error: any) {
+      // API HATASINI EKRANA YANSIT
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: error.message || 'Değişiklik talebi gönderilemedi.' });
+    }
   };
 
   const handleStartInstantReservation = (room: any) => {
     setRooms((prev: any[]) => prev.map((r: any) => r.id === room.id ? { ...r, status: 'Rezerve Ediliyor', lockEndTime: Date.now() + 3 * 60 * 1000 } : r));
     setInstantResRoom(room);
     setInstantResTitle('');
-  };
-
-  const handleCancelInstantRes = () => {
-    if (instantResRoom) {
-      setRooms((prev: any[]) => prev.map((r: any) => r.id === instantResRoom.id ? { ...r, status: 'Müsait', lockEndTime: null } : r));
-    }
-    setInstantResRoom(null);
   };
 
   const handleConfirmInstantReservation = async () => {
@@ -299,8 +317,7 @@ export default function Home() {
           title: finalTitle,
           startTime: startDate.toISOString(),
           endTime: endDate.toISOString(),
-          roomId: instantResRoom.id,
-          userId: "test-user-id-1234" 
+          roomId: instantResRoom.id
         })
       });
 
@@ -380,12 +397,13 @@ export default function Home() {
     });
   }
 
-  if (!isMounted) return null;
+  // KAYDET BUTONU ENGELLEYİCİ
+  const isSaveDisabled = !editForm.time || isPastSlotCheck(editForm.date, editForm.time);
+
+  if (!isMounted || !userMounted) return null;
 
   return (
     <div className="w-full flex flex-col gap-4 md:gap-5 xl:h-[calc(100vh-6.5rem)]">
-      
-      {/* ÜST İSTATİSTİK KARTLARI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 shrink-0">
         <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg p-4 md:p-5 flex flex-col justify-between shadow-sm dark:shadow-none">
           <div className="flex justify-between items-start mb-1">
@@ -420,8 +438,6 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-5 flex-1 min-h-0">
-        
-        {/* ANLIK ODA DURUMU */}
         <div className="xl:col-span-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg overflow-hidden flex flex-col min-h-[350px] xl:min-h-0 h-full shadow-sm dark:shadow-none">
           <div className="px-5 py-4 border-b border-gray-200 dark:border-[#2d2d2d] flex justify-between items-center bg-gray-50 dark:bg-[#212121] shrink-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Anlık Oda Durumu</h2>
@@ -475,7 +491,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* DİNAMİK SON İŞLEMLER (LOG) BÖLÜMÜ */}
         <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg flex flex-col min-h-[350px] xl:min-h-0 h-full shadow-sm dark:shadow-none">
           <div className="px-5 py-4 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] flex justify-between items-center shrink-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Son İşlemler</h2>
@@ -485,15 +500,15 @@ export default function Home() {
             {sortedLogOperations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 space-y-2 pt-8">
                 <span className="material-symbols-outlined text-4xl opacity-50">history</span>
-                <p className="text-xs font-semibold">Bugün işlem bulunmuyor</p>
+                <p className="text-xs font-semibold">Aktif işlem bulunmuyor</p>
               </div>
             ) : (
               sortedLogOperations.map((op: any) => {
                 const { actionText, icon, displayDetails, isCompleted } = getActionDetails(op);
                 const timeAgo = getTimeAgo(op.createdAt);
-                const canEdit = op.status !== 'iptal' && !isCompleted; 
                 
-                // YENİ: İptal edilmişse veya zamanı geçmişse soluk ve çizili göster
+                const isOwnerOrAdmin = user?.role === 'ADMIN' || op.originalData?.userId === user?.id;
+                const canEdit = op.status !== 'iptal' && !isCompleted && isOwnerOrAdmin; 
                 const isFaded = isCompleted || op.status === 'iptal';
 
                 return (
@@ -523,7 +538,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ANLIK REZERVASYON MODALI */}
       {instantResRoom && currentActiveSlot && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
@@ -536,7 +550,6 @@ export default function Home() {
               </button>
             </div>
             <div className="p-6 space-y-6">
-              
               <div className="flex flex-col gap-2 p-4 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg border border-gray-200 dark:border-[#333]">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Seçilen Oda</span>
@@ -575,7 +588,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* REZERVASYON DÜZENLEME MODALI */}
       {editingOp && (() => {
         return (
           <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4">
@@ -602,33 +614,18 @@ export default function Home() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Saat Aralığı</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    
-                    {TIME_SLOTS.filter(slot => {
-                      if (!now || !editForm.date) return true;
-                      const todayStrLocal = getLocalYYYYMMDD(new Date(now));
-                      
-                      if (editForm.date === todayStrLocal) {
-                        const startHourNum = parseInt(slot.split(' - ')[0].split(':')[0], 10);
-                        const startMinNum = parseInt(slot.split(' - ')[0].split(':')[1], 10);
-                        const d = new Date(now);
-                        const currentTotalMins = d.getHours() * 60 + d.getMinutes();
-                        const startTotalMins = startHourNum * 60 + startMinNum;
-                        
-                        if (startTotalMins <= currentTotalMins && slot !== originalTime) {
-                          return false;
-                        }
-                      }
-                      return true;
-                    }).map(slot => {
+                    {TIME_SLOTS.map(slot => {
                       const isSelected = editForm.time === slot; 
+                      const isPastSlot = isPastSlotCheck(editForm.date, slot); 
                       const isOccupied = occupiedSlots.includes(slot) && slot !== originalTime; 
-                      const isDisabled = isOccupied;
                       
+                      const isDisabled = isOccupied || isPastSlot;
+
                       return (
-                        <button key={slot} disabled={isDisabled} onClick={() => setEditForm({...editForm, time: slot})} className={`p-3 rounded border text-base font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${isSelected ? 'bg-[#E4032C] border-[#E4032C] text-white' : isOccupied ? 'bg-gray-100 dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333] text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60' : 'bg-white dark:bg-[#1c1c1c] border-gray-300 dark:border-[#3d3d3d] text-gray-700 dark:text-gray-300 hover:border-[#E4032C] hover:text-[#E4032C]'}`}>
+                        <button key={slot} disabled={isDisabled} onClick={() => setEditForm({...editForm, time: slot})} className={`p-3 rounded border text-base font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${isSelected ? 'bg-[#E4032C] border-[#E4032C] text-white' : isDisabled ? 'bg-gray-100 dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333] text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60' : 'bg-white dark:bg-[#1c1c1c] border-gray-300 dark:border-[#3d3d3d] text-gray-700 dark:text-gray-300 hover:border-[#E4032C] hover:text-[#E4032C]'}`}>
                           <span>{slot}</span>
-                          <span className={`text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-white' : isOccupied ? 'text-gray-400 dark:text-gray-600' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                            {isOccupied ? 'Dolu' : isSelected ? 'Seçildi' : 'Boş'}
+                          <span className={`text-[10px] uppercase tracking-wider font-bold ${isSelected ? 'text-white' : isDisabled ? 'text-gray-400 dark:text-gray-600' : 'text-emerald-600 dark:text-emerald-500'}`}>
+                            {isOccupied ? 'Dolu' : isPastSlot ? 'Geçti' : isSelected ? 'Seçildi' : 'Boş'}
                           </span>
                         </button>
                       )
@@ -637,7 +634,7 @@ export default function Home() {
                 </div>
                 <div className="flex justify-end gap-3 pt-5 mt-2 border-t border-gray-100 dark:border-[#2d2d2d]">
                   <button onClick={() => setEditingOp(null)} className="px-5 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded">İptal</button>
-                  <button onClick={handlePreSaveEdit} disabled={!editForm.time} className={`px-5 py-2.5 text-sm font-bold rounded text-white ${!editForm.time ? 'bg-[#E4032C] opacity-50 cursor-not-allowed' : 'bg-[#E4032C] hover:bg-red-700'}`}>Kaydet</button>
+                  <button onClick={handlePreSaveEdit} disabled={isSaveDisabled} className={`px-5 py-2.5 text-sm font-bold rounded text-white ${isSaveDisabled ? 'bg-[#E4032C] opacity-50 cursor-not-allowed' : 'bg-[#E4032C] hover:bg-red-700'}`}>Kaydet</button>
                 </div>
               </div>
             </div>
@@ -645,7 +642,6 @@ export default function Home() {
         );
       })()}
 
-      {/* ONAYA GÖNDERME UYARI MODALI */}
       {confirmEditOp && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[110] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden">
@@ -656,7 +652,7 @@ export default function Home() {
               </h3>
             </div>
             <div className="p-5">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-6">Yaptığınız değişiklik yönetici onayına gönderilecektir. Onaylanana kadar mevcut rezervasyonunuz geçerli kalacaktır.</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-6">Yaptığınız değişiklik veritabanına kaydedilerek yönetici onayına sunulacaktır. Onaylanana kadar mevcut rezervasyonunuz geçerli kalacaktır.</p>
               <div className="flex justify-end gap-3">
                 <button onClick={() => { setConfirmEditOp(null); setEditingOp(confirmEditOp); }} className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded">Vazgeç</button>
                 <button onClick={handleSendToApproval} className="px-4 py-2 text-sm font-bold bg-[#E4032C] text-white hover:bg-red-700 rounded transition-colors">Onaya Gönder</button>
@@ -666,7 +662,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* İPTAL ONAY MODALI */}
       {deletingOp && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden">

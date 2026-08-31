@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 export interface Room {
   id: string;
@@ -17,6 +17,9 @@ export interface Reservation {
   end: number;
   title: string;
   date: string | null;
+  status?: string;
+  userId?: string;
+  user?: any;
 }
 
 export interface Operation {
@@ -30,6 +33,7 @@ export interface Operation {
     date: string;
   };
   createdAt?: string; 
+  originalData?: any; 
 }
 
 export interface PendingSelection {
@@ -49,10 +53,11 @@ interface ReservationContextProps {
   setPendingSelection: (selection: PendingSelection | null) => void;
   pendingTitle: string;
   setPendingTitle: (title: string) => void;
-  requestOperationEdit: (id: string, newDetails: string, newDate: string) => void;
-  approveOperationEdit: (id: string) => void;
-  rejectOperationEdit: (id: string) => void;
-  cancelOperation: (id: string) => void;
+  requestOperationEdit: (id: string, updatedData: any) => Promise<void>;
+  approveOperationEdit: (id: string) => Promise<void>;
+  rejectOperationEdit: (id: string) => Promise<void>;
+  cancelOperation: (id: string) => Promise<void>;
+  refreshReservations: () => Promise<void>;
 }
 
 const ReservationContext = createContext<ReservationContextProps | undefined>(undefined);
@@ -65,103 +70,143 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
   const [pendingTitle, setPendingTitle] = useState('');
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        // YENİ EKLENDİ: cache: 'no-store'
-        const response = await fetch('/api/meeting-rooms', { cache: 'no-store' });
-        if (response.ok) {
-          const data = await response.json();
-          const formattedRooms = data.map((room: any) => ({
-            ...room,
-            status: room.status || 'Müsait',
-            lockEndTime: room.lockEndTime || null
-          }));
-          setRooms(formattedRooms);
-        }
-      } catch (error) {
-        console.error("Odalar çekilirken hata:", error);
+  const fetchRooms = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/meeting-rooms?_t=${Date.now()}`, { 
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRooms(data.map((room: any) => ({ ...room, status: room.status || 'Müsait', lockEndTime: room.lockEndTime || null })));
       }
-    };
+    } catch (error) {
+      console.error("Odalar çekilirken hata:", error);
+    }
+  }, []);
 
-    const fetchReservations = async () => {
-      try {
-        // YENİ EKLENDİ VE KRİTİK: cache: 'no-store'
-        const response = await fetch('/api/reservations', { cache: 'no-store' });
-        if (response.ok) {
-          const dbReservations = await response.json();
+  const fetchReservations = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/reservations?_t=${Date.now()}`, { 
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+      });
+      
+      if (response.ok) {
+        const dbReservations = await response.json();
+        
+        const formattedReservations = dbReservations.map((res: any) => {
+          const startObj = new Date(res.startTime);
+          const endObj = new Date(res.endTime);
+          const year = startObj.getFullYear();
+          const month = String(startObj.getMonth() + 1).padStart(2, '0');
+          const day = String(startObj.getDate()).padStart(2, '0');
           
-          const formattedOperations: Operation[] = dbReservations.map((res: any) => {
-            const start = new Date(res.startTime);
-            const end = new Date(res.endTime);
-            
-            const startTimeStr = start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-            const endTimeStr = end.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-            
-            const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-            const dateStr = `${start.getDate()} ${months[start.getMonth()]}`;
+          return {
+            ...res,
+            start: startObj.getHours() + startObj.getMinutes() / 60,
+            end: endObj.getHours() + endObj.getMinutes() / 60,
+            date: `${year}-${month}-${day}` 
+          };
+        });
 
-            let opStatus: 'aktif' | 'iptal' | 'bekliyor' | 'tamamlandı' = 'aktif';
-            if (res.status === 'CANCELLED') opStatus = 'iptal';
-            if (res.status === 'PENDING') opStatus = 'bekliyor';
-            if (res.status === 'COMPLETED') opStatus = 'tamamlandı';
+        const formattedOperations: Operation[] = dbReservations.map((res: any) => {
+          const start = new Date(res.startTime);
+          const end = new Date(res.endTime);
+          
+          const startTimeStr = start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+          const endTimeStr = end.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+          const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+          const dateStr = `${start.getDate()} ${months[start.getMonth()]}`;
 
-            return {
-              id: res.id,
-              title: res.title,
-              details: `${res.room?.name || 'Bilinmeyen Oda'} • ${startTimeStr} - ${endTimeStr}`,
-              date: dateStr,
-              status: opStatus,
-              createdAt: res.createdAt 
-            };
-          });
+          let opStatus: 'aktif' | 'iptal' | 'bekliyor' | 'tamamlandı' = 'aktif';
+          if (res.status === 'CANCELLED') opStatus = 'iptal';
+          else if (res.status === 'PENDING') opStatus = 'bekliyor';
+          else if (res.status === 'COMPLETED') opStatus = 'tamamlandı';
 
-          setOperations(formattedOperations);
-          setReservations(dbReservations);
-        }
-      } catch (error) {
-        console.error("Rezervasyonlar çekilirken hata:", error);
+          return {
+            id: res.id,
+            title: res.title,
+            details: `${res.room?.name || 'Bilinmeyen Oda'} • ${startTimeStr} - ${endTimeStr}`,
+            date: dateStr,
+            status: opStatus,
+            createdAt: res.createdAt,
+            originalData: res 
+          };
+        });
+
+        setOperations(formattedOperations);
+        setReservations(formattedReservations);
       }
-    };
+    } catch (error) {
+      console.error("Rezervasyonlar çekilirken hata:", error);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchRooms();
     fetchReservations();
     setMounted(true);
-  }, []);
+  }, [fetchRooms, fetchReservations]);
 
-  const cancelOperation = (id: string) => {
-    setOperations(prev => prev.map(op => op.id === id ? { ...op, status: 'iptal' } : op));
+  const cancelOperation = async (id: string) => {
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'CANCELLED' })
+      });
+      if (response.ok) await fetchReservations(); 
+      else throw new Error("İptal edilemedi.");
+    } catch (error: any) { throw error; }
   };
 
-  const requestOperationEdit = (id: string, newDetails: string, newDate: string) => {
-    setOperations(prev => prev.map(op => 
-      op.id === id ? { ...op, status: 'bekliyor', pendingChanges: { details: newDetails, date: newDate } } : op
-    ));
-  };
-
-  const approveOperationEdit = (id: string) => {
-    setOperations(prev => prev.map(op => {
-      if (op.id === id && op.pendingChanges) {
-        return { 
-          ...op, details: op.pendingChanges.details, date: op.pendingChanges.date, 
-          status: 'aktif', pendingChanges: undefined 
-        };
+  const requestOperationEdit = async (id: string, updatedData: any) => {
+    try {
+      const response = await fetch(`/api/reservations`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...updatedData }) 
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "İşlem reddedildi.");
       }
-      return op;
-    }));
+      await fetchReservations(); 
+    } catch (error: any) {
+      throw error; 
+    }
   };
 
-  const rejectOperationEdit = (id: string) => {
-    setOperations(prev => prev.map(op => 
-      op.id === id ? { ...op, status: 'aktif', pendingChanges: undefined } : op
-    ));
+  const approveOperationEdit = async (id: string) => {
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'APPROVE' })
+      });
+      if (response.ok) await fetchReservations(); 
+    } catch (error) { console.error(error); }
+  };
+
+  const rejectOperationEdit = async (id: string) => {
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'REJECT' })
+      });
+      if (response.ok) await fetchReservations();
+    } catch (error) { console.error(error); }
   };
 
   return (
     <ReservationContext.Provider value={{ 
       rooms, setRooms, reservations, setReservations, operations, setOperations,
       pendingSelection, setPendingSelection, pendingTitle, setPendingTitle,
-      requestOperationEdit, approveOperationEdit, rejectOperationEdit, cancelOperation
+      requestOperationEdit, approveOperationEdit, rejectOperationEdit, cancelOperation,
+      refreshReservations: fetchReservations 
     }}>
       {children}
     </ReservationContext.Provider>
@@ -170,6 +215,6 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
 
 export const useReservationData = () => {
   const context = useContext(ReservationContext);
-  if (!context) throw new Error("useReservationData must be used within a ReservationProvider");
+  if (!context) throw new Error("Context Hatası");
   return context;
 };

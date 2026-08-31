@@ -13,6 +13,9 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   
+  // LOGIN SAYFASINDA MENÜYÜ GİZLEME MANTIĞI EKLENDİ
+  if (pathname === '/login') return null;
+
   const getLinkClass = (path: string) => {
     const isActive = pathname === path;
     return `flex items-center ${isExpanded ? 'gap-3 px-3' : 'justify-center px-0'} py-3 rounded-lg text-sm transition-colors border-l-[3px] relative ${
@@ -78,7 +81,6 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
           )}
         </div>
 
-       
       </div>
     </nav>
   );

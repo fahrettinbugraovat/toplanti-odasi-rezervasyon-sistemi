@@ -1,11 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation'; // EKLENDİ
 import Link from 'next/link';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean | null>(null);
+  const pathname = usePathname(); // EKLENDİ
 
   useEffect(() => {
     const savedState = localStorage.getItem('sidebarState');
@@ -27,6 +29,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setIsSidebarOpen(false);
     }
   };
+
+  // KRİTİK NOKTA EKLENDİ: Sayfa /login ise tüm menüleri, butonları ve boşlukları yoksay!
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
 
   if (isSidebarOpen === null) {
     return <div className="bg-gray-50 dark:bg-[#141414] h-screen w-full"></div>;
