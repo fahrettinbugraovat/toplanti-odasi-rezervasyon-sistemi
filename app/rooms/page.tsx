@@ -27,7 +27,7 @@ export default function RoomsPage() {
     const currentMins = currentDate.getHours() * 60 + currentDate.getMinutes();
 
     // Sadece aktif olan rezervasyonları filtrele
-    const activeMeetings = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor');
+    const activeMeetings = operations.filter((op: any) => op.status !== 'iptal');
 
     for (const op of activeMeetings) {
       // 1. Tarih bugüne mi ait?

@@ -40,28 +40,22 @@ model Room {
 }
 
 model Reservation {
-  id               String            @id @default(cuid())
-  title            String            
-  
-  startTime        DateTime
-  endTime          DateTime
-  
-  status           ReservationStatus @default(ACTIVE) 
-  
-  // ONAY SÜRECİ İÇİN GEÇİCİ DEĞİŞİKLİK ALANLARI
-  pendingStartTime DateTime?    
-  pendingEndTime   DateTime?    
-  pendingTitle     String?      
-  
-  room             Room              @relation(fields: [roomId], references: [id])
-  roomId           String
-  
-  // KULLANICI SAHİPLİĞİ (OWNERSHIP) ALANLARI
-  user             User              @relation(fields: [userId], references: [id])
-  userId           String
+  id        String            @id @default(cuid())
+  title     String
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  startTime DateTime
+  endTime   DateTime
+
+  status    ReservationStatus @default(ACTIVE)
+
+  room      Room              @relation(fields: [roomId], references: [id])
+  roomId    String
+
+  user      User              @relation(fields: [userId], references: [id])
+  userId    String
+
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 enum Role {
@@ -70,8 +64,7 @@ enum Role {
 }
 
 enum ReservationStatus {
-  ACTIVE    
-  PENDING
+  ACTIVE
   CANCELLED
   COMPLETED
 }

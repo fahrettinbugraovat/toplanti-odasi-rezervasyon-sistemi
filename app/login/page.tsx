@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTheme } from '../context/ThemeContext';
 import Link from 'next/link';
 
@@ -8,10 +7,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState(''); 
-  const [isLoading, setIsLoading] = useState(false); 
-  const router = useRouter();
-  
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
   const { theme, toggleTheme } = useTheme();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -23,7 +21,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }) 
+        body: JSON.stringify({ email, password })
       });
 
       if (!res.ok) {
@@ -32,97 +30,126 @@ export default function LoginPage() {
       }
 
       window.location.href = '/';
-      
     } catch (err: any) {
-      setError(err.message); 
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f4f7fa] via-white to-[#fcedf0] dark:from-[#121212] dark:via-[#1a1a1a] dark:to-[#221518]">
-      
-      <div className="flex-grow flex flex-col items-center justify-center p-4">
-        
-        <div className="mb-8">
-          <img src="/trtlogo.png" alt="TRT Logo" className="h-10 md:h-12 w-auto object-contain" />
+    <div className={`min-h-screen flex flex-col ${theme === 'dark' ? 'bg-[#111111] text-white' : 'bg-[#f4f4f4] text-[#1f1f1f]'}`}>
+      <div className="flex-grow flex flex-col items-center justify-center px-4 py-8">
+        <div className="mb-7 md:mb-8">
+          <img src="/trtlogo.png" alt="TRT Logo" className="h-12 md:h-16 w-auto object-contain" />
         </div>
 
-        <div className="bg-white dark:bg-[#1c1c1c] w-full max-w-[420px] p-8 sm:p-10 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-gray-100 dark:border-[#2d2d2d]">
-          
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Giriş Yap</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Devam etmek için hesabınıza giriş yapın.</p>
+        <div className={`w-full max-w-[420px] rounded-[10px] border ${theme === 'dark' ? 'bg-[#1b1b1b] border-[#2b2b2b] shadow-[0_0_0_1px_rgba(255,255,255,0.02)]' : 'bg-[#f5f5f5] border-[#e5e5e5] shadow-[0_0_0_1px_rgba(0,0,0,0.02)]'} p-5 sm:p-6`}>
+          <div className="mb-6 text-center">
+            <h2 className={`text-[1.7rem] md:text-[1.9rem] font-bold leading-tight ${theme === 'dark' ? 'text-white' : 'text-[#1b1b1b]'}`}>
+              Giriş Yap
+            </h2>
           </div>
 
           {error && (
-            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm font-medium rounded text-center">
+            <div className="mb-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-center text-sm font-medium text-red-600">
               {error}
             </div>
           )}
 
-          {/* CHROME OTOMATİK DOLDURMAYI ENGELLEMEK İÇİN autoComplete="off" EKLENDİ */}
-          <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">E-posta</label>
-              <div className="flex items-center px-4 py-3 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] focus-within:border-[#E4032C] focus-within:ring-1 focus-within:ring-[#E4032C] transition-all">
-                <span className="material-symbols-outlined text-gray-400 mr-3 text-[20px]">mail</span>
+          <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
+            <div>
+              <label className={`mb-2 block text-[0.9rem] font-semibold ${theme === 'dark' ? 'text-[#e6e6e6]' : 'text-[#2a2a2a]'}`}>
+                E-posta
+              </label>
+              <div className="relative">
+                <span className={`material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] ${theme === 'dark' ? 'text-[#d2d2d2]' : 'text-[#6b6b6b]'}`}>
+                  person
+                </span>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ornek@sirket.com"
-                  autoComplete="off" // DÜZELTME
-                  className="w-full bg-transparent outline-none text-sm text-gray-900 dark:text-white [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s] [&:-webkit-autofill]:[-webkit-text-fill-color:#111827] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:#fff]"
+                  autoComplete="off"
                   required
+                  className={`h-[48px] w-full rounded-[6px] border py-2 pl-10 pr-4 text-[0.98rem] focus:outline-none focus:ring-2 focus:ring-[#E4032C] focus:border-[#E4032C] ${theme === 'dark' ? 'bg-[#2b2b2b] border-[#3a3a3a] text-white placeholder:text-[#a1a1a1]' : 'bg-[#f3f3f3] border-[#d4d4d4] text-[#1d1d1d] placeholder:text-[#8a8a8a]'}`}
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Şifre</label>
-              <div className="flex items-center px-4 py-3 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] focus-within:border-[#E4032C] focus-within:ring-1 focus-within:ring-[#E4032C] transition-all">
-                <span className="material-symbols-outlined text-gray-400 mr-3 text-[20px]">lock</span>
+            <div>
+              <label className={`mb-2 block text-[0.9rem] font-semibold ${theme === 'dark' ? 'text-[#e6e6e6]' : 'text-[#2a2a2a]'}`}>
+                Şifre
+              </label>
+              <div className="relative">
+                <span className={`material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] ${theme === 'dark' ? 'text-[#d2d2d2]' : 'text-[#6b6b6b]'}`}>
+                  lock
+                </span>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  autoComplete="new-password" // DÜZELTME: Chrome'u engellemenin en kesin yolu
-                  className="w-full bg-transparent outline-none text-sm text-gray-900 dark:text-white [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s] [&:-webkit-autofill]:[-webkit-text-fill-color:#111827] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:#fff]"
+                  autoComplete="new-password"
                   required
+                  className={`h-[48px] w-full rounded-[6px] border py-2 pl-10 pr-10 text-[0.98rem] focus:outline-none focus:ring-2 focus:ring-[#E4032C] focus:border-[#E4032C] ${theme === 'dark' ? 'bg-[#2b2b2b] border-[#3a3a3a] text-white placeholder:text-[#a1a1a1]' : 'bg-[#f3f3f3] border-[#d4d4d4] text-[#1d1d1d] placeholder:text-[#8a8a8a]'}`}
                 />
+                <span className={`material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[18px] ${theme === 'dark' ? 'text-[#d2d2d2]' : 'text-[#6b6b6b]'}`}>
+                  visibility_off
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center">
-              <input type="checkbox" id="remember" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="w-4 h-4 text-[#E4032C] bg-gray-100 border-gray-300 rounded focus:ring-[#E4032C] focus:ring-2 cursor-pointer" />
-              <label htmlFor="remember" className="ml-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">Beni Hatırla</label>
+            <div className="flex items-center pt-0.5">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-[#8a8a8a] bg-[#f3f3f3] text-[#E4032C] focus:ring-[#E4032C]"
+              />
+              <label htmlFor="remember" className={`ml-2 cursor-pointer select-none text-sm ${theme === 'dark' ? 'text-[#d7d7d7]' : 'text-[#3d3d3d]'}`}>
+                Beni Hatırla
+              </label>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-[#E4032C] hover:bg-red-700 disabled:opacity-50 text-white text-sm font-bold rounded transition-colors shadow-sm flex justify-center items-center"
+              className={`flex h-[48px] w-full items-center justify-center rounded-[6px] bg-[#E4032C] px-4 text-[0.98rem] font-semibold text-white transition-colors duration-200 hover:bg-[#c90026] disabled:cursor-not-allowed disabled:opacity-70`}
             >
-              {isLoading ? <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span> : 'Giriş Yap'}
+              {isLoading ? 'Yükleniyor...' : 'Giriş Yap'}
             </button>
+
+            <div className="pt-1">
+              <div className="flex items-center justify-between border-t border-[#d9d9d9] pt-3">
+                <div className={`flex items-center gap-2 text-[0.95rem] font-medium ${theme === 'dark' ? 'text-white' : 'text-[#3b3b3b]'}`}>
+                  <span className={`material-symbols-outlined text-[18px] ${theme === 'dark' ? 'text-white' : 'text-[#8a8a8a]'}`}>
+                    {theme === 'dark' ? 'dark_mode' : 'light_mode'}
+                  </span>
+                  <span>{theme === 'dark' ? 'Koyu Tema' : 'Açık Tema'}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label="Tema değiştir"
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-[#4b5563]' : 'bg-[#dfe3e8]'}`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+              </div>
+            </div>
           </form>
-
-          <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#2d2d2d] flex justify-center">
-            <button type="button" onClick={toggleTheme} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors">
-              <span className="material-symbols-outlined text-[20px]">{theme === 'dark' ? 'dark_mode' : 'light_mode'}</span>
-              {theme === 'dark' ? 'Koyu Tema' : 'Açık Tema'}
-            </button>
-          </div>
-
         </div>
       </div>
 
-      <footer className="w-full bg-white dark:bg-[#1c1c1c] border-t border-gray-200 dark:border-[#2d2d2d] py-4 px-6 md:px-12 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 dark:text-gray-400 z-10 shrink-0">
+      <footer className={`flex w-full items-center justify-between border-t px-6 py-4 text-xs ${theme === 'dark' ? 'border-[#262626] bg-[#111111] text-[#a3a3a3]' : 'border-[#e5e5e5] bg-[#f8f8f8] text-[#666666]'}`}>
         <span>© 2026 TRT Bilgi Teknolojileri Daire Başkanlığı</span>
-        <Link href="/destek" className="mt-2 md:mt-0 font-medium hover:text-gray-900 dark:hover:text-white transition-colors">Destek</Link>
+        <Link href="/destek" className="font-medium transition-colors hover:text-[#E4032C]">Destek</Link>
       </footer>
 
     </div>

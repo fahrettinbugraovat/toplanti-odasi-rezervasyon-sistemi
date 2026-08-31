@@ -12,11 +12,11 @@ export default function AdminPanelPage() {
   const { 
     rooms, setRooms, 
     operations, setOperations,
-    approveOperationEdit, rejectOperationEdit, cancelOperation 
+    cancelOperation 
   } = useReservationData();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'ozet' | 'odalar' | 'rezervasyonlar' | 'onaylar'>('ozet');
+  const [activeTab, setActiveTab] = useState<'ozet' | 'odalar' | 'rezervasyonlar'>('ozet');
   
   const [roomForm, setRoomForm] = useState({ name: '', capacity: '', features: '' });
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
@@ -89,13 +89,11 @@ export default function AdminPanelPage() {
     return false;
   };
 
-  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor' && !isMeetingCompleted(op));
+  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && !isMeetingCompleted(op));
   const cancelledOperations = operations.filter((op: any) => op.status === 'iptal');
-  const pendingOperations = operations.filter((op: any) => op.status === 'bekliyor');
 
   const sortedOperationsForTable = [...operations].sort((a: any, b: any) => {
     const getStatusWeight = (op: any) => {
-      if (op.status === 'bekliyor') return 1;
       if (op.status === 'iptal') return 4;
       if (isMeetingCompleted(op)) return 3; 
       return 2; 
@@ -194,16 +192,6 @@ export default function AdminPanelPage() {
     }
   };
 
-  const handleApprove = (id: string) => {
-    approveOperationEdit(id);
-    showToast({ type: 'success', title: 'Değişiklik Onaylandı', message: 'Rezervasyon değişikliği başarıyla uygulandı.' });
-  };
-
-  const handleReject = (id: string) => {
-    rejectOperationEdit(id);
-    showToast({ type: 'success', title: 'Değişiklik Reddedildi', message: 'Rezervasyon değişikliği reddedildi, mevcut kayıt korundu.' });
-  };
-
   return (
     <div className="w-full flex flex-col gap-5 h-full max-w-[1400px] mx-auto overflow-hidden">
       
@@ -220,13 +208,6 @@ export default function AdminPanelPage() {
         <button onClick={() => setActiveTab('rezervasyonlar')} className={`pb-3 text-sm font-bold transition-colors relative whitespace-nowrap ${activeTab === 'rezervasyonlar' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
           Tüm Rezervasyonlar
           {activeTab === 'rezervasyonlar' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E4032C]"></div>}
-        </button>
-        <button onClick={() => setActiveTab('onaylar')} className={`pb-3 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'onaylar' ? 'text-[#E4032C]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>
-          Onay Bekleyenler
-          {pendingOperations.length > 0 && (
-            <span className="bg-[#E4032C] text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingOperations.length}</span>
-          )}
-          {activeTab === 'onaylar' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E4032C]"></div>}
         </button>
       </div>
 
@@ -429,40 +410,31 @@ export default function AdminPanelPage() {
                 <tbody className="text-gray-700 dark:text-gray-200 divide-y divide-gray-100 dark:divide-[#2d2d2d]">
                   {sortedOperationsForTable.map((op: any) => {
                     const isCancelled = op.status === 'iptal';
-                    const isPending = op.status === 'bekliyor';
                     const isCompleted = isMeetingCompleted(op);
                     const isAct = (op.status === 'aktif' || !op.status) && !isCompleted;
                     
                     return (
-                      <tr key={op.id} className={`hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors ${(isCancelled || isCompleted) ? 'opacity-50' : isPending ? 'bg-amber-50/30 dark:bg-amber-900/10' : ''}`}>
+                      <tr key={op.id} className={`hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors ${isCancelled || isCompleted ? 'opacity-50' : ''}`}>
                         <td className="px-6 py-4">
                           <p className={`font-bold text-sm ${(isCancelled || isCompleted) ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>{op.title}</p>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-sm font-semibold">{isPending ? op.pendingChanges?.date : op.date}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{isPending ? op.pendingChanges?.details : op.details}</p>
+                          <p className="text-sm font-semibold">{op.date}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{op.details}</p>
                         </td>
                         <td className="px-6 py-4">
                           {isAct && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-500">Aktif</span>}
                           {isCompleted && !isCancelled && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-500 flex items-center gap-1 w-max"><span className="material-symbols-outlined text-[14px]">check_circle</span> Tamamlandı</span>}
                           {isCancelled && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-gray-200 text-gray-600 dark:bg-[#333] dark:text-gray-400">İptal Edildi</span>}
-                          {isPending && <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-500 flex items-center gap-1 w-max"><span className="material-symbols-outlined text-[14px]">schedule</span> Onay Bekliyor</span>}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          {isPending ? (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => handleReject(op.id)} className="px-3 py-1.5 text-[11px] font-bold rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors dark:bg-[#333] dark:text-gray-300 dark:hover:bg-[#444]">Reddet</button>
-                              <button onClick={() => handleApprove(op.id)} className="px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-500 hover:text-white transition-colors dark:bg-emerald-900/20 dark:border-emerald-900/50 dark:text-emerald-400">Onayla</button>
-                            </div>
-                          ) : (
-                            <button 
-                              onClick={() => handleCancelReservation(op.id)} 
-                              disabled={isCancelled || isCompleted}
-                              className={`px-3 py-1 text-xs font-bold rounded transition-colors ${(isCancelled || isCompleted) ? 'opacity-0 cursor-not-allowed' : 'bg-white border border-[#E4032C] text-[#E4032C] hover:bg-[#E4032C] hover:text-white dark:bg-transparent dark:border-[#E4032C] dark:hover:bg-[#E4032C] dark:hover:text-white'}`}
-                            >
-                              İptal Et
-                            </button>
-                          )}
+                          <button 
+                            onClick={() => handleCancelReservation(op.id)} 
+                            disabled={isCancelled || isCompleted}
+                            className={`px-3 py-1 text-xs font-bold rounded transition-colors ${(isCancelled || isCompleted) ? 'opacity-0 cursor-not-allowed' : 'bg-white border border-[#E4032C] text-[#E4032C] hover:bg-[#E4032C] hover:text-white dark:bg-transparent dark:border-[#E4032C] dark:hover:bg-[#E4032C] dark:hover:text-white'}`}
+                          >
+                            İptal Et
+                          </button>
                         </td>
                       </tr>
                     );
@@ -473,58 +445,6 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* ==================================================== */}
-        {/* 4. SEKME: ONAY BEKLEYENLER                           */}
-        {/* ==================================================== */}
-        {activeTab === 'onaylar' && (
-          <div className="bg-white dark:bg-[#1c1c1c] border border-[#E4032C]/30 dark:border-[#E4032C]/50 rounded-lg overflow-hidden shadow-sm flex flex-col h-full">
-            <div className="px-6 py-5 border-b border-[#E4032C]/20 dark:border-[#E4032C]/30 bg-red-50/50 dark:bg-red-900/10 flex justify-between items-center shrink-0">
-              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#E4032C] text-[22px]">rule</span>
-                Onay Bekleyen Değişiklik Talepleri
-              </h2>
-              <span className="text-xs font-bold bg-white dark:bg-[#141414] border border-[#E4032C]/30 text-[#E4032C] px-3 py-1 rounded-full">{pendingOperations.length} Kayıt</span>
-            </div>
-            <div className="px-6 flex flex-col flex-1 min-h-0 overflow-y-auto pb-24">
-              {pendingOperations.length > 0 ? (
-                pendingOperations.map((op: any) => {
-                  const [oldRoomName, oldTimeStr] = op.details.split(' • ');
-                  const [newRoomName, newTimeStr] = (op.pendingChanges?.details || '').split(' • ');
-                  return (
-                    <div key={op.id} className="py-5 border-b border-gray-100 dark:border-[#2d2d2d] last:border-0 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                      <div className="flex-1">
-                        <p className="font-bold text-sm text-gray-900 dark:text-white">{op.title}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{user.fullName}</p>
-                      </div>
-                      <div className="flex-[2] flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 bg-gray-50 dark:bg-[#1a1a1a] p-3 rounded-lg border border-gray-100 dark:border-[#333]">
-                        <div className="flex-1">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Mevcut Durum</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">{op.date}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">{oldRoomName} • {oldTimeStr}</p>
-                        </div>
-                        <span className="hidden sm:block material-symbols-outlined text-gray-300 dark:text-gray-600">arrow_forward</span>
-                        <div className="flex-1">
-                          <p className="text-[10px] font-bold text-[#E4032C] uppercase mb-1">Yeni Talep</p>
-                          <p className="text-sm text-gray-900 dark:text-white font-bold">{op.pendingChanges?.date}</p>
-                          <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">{newRoomName} • {newTimeStr}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <button onClick={() => handleReject(op.id)} className="px-5 py-2 text-xs font-bold rounded bg-white dark:bg-[#141414] border border-gray-300 dark:border-[#444] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333] transition-colors">Reddet</button>
-                        <button onClick={() => handleApprove(op.id)} className="px-5 py-2 text-xs font-bold rounded bg-[#E4032C] hover:bg-red-700 text-white transition-colors">Onayla</button>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="py-12 flex flex-col items-center justify-center text-gray-400">
-                  <span className="material-symbols-outlined text-4xl opacity-40 mb-3">fact_check</span>
-                  <p className="text-sm font-semibold">Onay bekleyen değişiklik talebi bulunmuyor.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
       </div>
 

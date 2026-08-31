@@ -37,18 +37,19 @@ export default function Home() {
   const isPastSlotCheck = (dateStr: string, timeStr: string) => {
     if (!dateStr || !timeStr || !now) return false;
     const todayStrLocal = getLocalYYYYMMDD(new Date(now));
-    
-    if (dateStr < todayStrLocal) return true; // Geçmiş gün
-    if (dateStr === todayStrLocal) {
-       const startHour = parseInt(timeStr.split(' - ')[0].split(':')[0], 10);
-       const startMin = parseInt(timeStr.split(' - ')[0].split(':')[1], 10);
-       const slotTotalMins = startHour * 60 + startMin;
-       
-       const d = new Date(now);
-       const currentTotalMins = d.getHours() * 60 + d.getMinutes();
-       if (slotTotalMins <= currentTotalMins) return true; 
-    }
-    return false;
+
+    if (dateStr < todayStrLocal) return true;
+    if (dateStr > todayStrLocal) return false;
+    if (!timeStr.includes(' - ')) return false;
+
+    const endTimePart = timeStr.split(' - ')[1].trim();
+    const endHour = parseInt(endTimePart.split(':')[0], 10);
+    const endMin = parseInt(endTimePart.split(':')[1], 10);
+
+    const currentTotalMins = new Date(now).getHours() * 60 + new Date(now).getMinutes();
+    const endTotalMins = endHour * 60 + endMin;
+
+    return endTotalMins <= currentTotalMins;
   };
 
   const formatDateForList = (dateString: string) => {
@@ -100,7 +101,7 @@ export default function Home() {
     return false;
   };
 
-  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && op.status !== 'bekliyor' && !isMeetingCompleted(op));
+  const activeOperations = operations.filter((op: any) => op.status !== 'iptal' && !isMeetingCompleted(op));
   
   const sortedLogOperations = [...operations]
     .filter((op: any) => op.status !== 'iptal' && !isMeetingCompleted(op))
@@ -112,19 +113,7 @@ export default function Home() {
     .slice(0, 15); 
 
   const getAllBlocks = () => {
-    const blocks: any[] = [];
-    operations.forEach((op: any) => {
-      if (op.status === 'iptal') return;
-      if (op.status === 'bekliyor') {
-        blocks.push({ ...op });
-        if (op.pendingChanges) {
-          blocks.push({ ...op, date: op.pendingChanges.date, details: op.pendingChanges.details });
-        }
-      } else {
-        blocks.push({ ...op });
-      }
-    });
-    return blocks;
+    return operations.filter((op: any) => op.status !== 'iptal');
   };
 
   const totalReservations = activeOperations.length;
@@ -260,12 +249,12 @@ export default function Home() {
     setEditingOp(null); 
   };
 
-  const handleSendToApproval = async () => {
+  const handleSaveEdit = async () => {
     if (!confirmEditOp) return;
     try {
       const [startStr, endStr] = editForm.time.split(' - ');
       const baseDate = editForm.date ? new Date(editForm.date) : new Date();
-      
+
       const startTime = new Date(baseDate);
       startTime.setHours(parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0, 0);
 
@@ -279,11 +268,9 @@ export default function Home() {
       });
 
       setConfirmEditOp(null);
-      // BAŞARILI İSE TOAST GÖSTER
-      showToast({ type: 'success', title: 'Onaya Gönderildi', message: 'Değişiklik isteğiniz veritabanına kaydedildi ve onaya sunuldu.' });
+      showToast({ type: 'success', title: 'Rezervasyon Güncellendi', message: 'Rezervasyon bilgileri başarıyla güncellendi.' });
     } catch (error: any) {
-      // API HATASINI EKRANA YANSIT
-      showToast({ type: 'error', title: 'İşlem Başarısız', message: error.message || 'Değişiklik talebi gönderilemedi.' });
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: error.message || 'Değişiklik kaydedilemedi.' });
     }
   };
 
@@ -350,25 +337,19 @@ export default function Home() {
 
   const getActionDetails = (op: any) => {
     const isCompleted = isMeetingCompleted(op);
-    let actionText = "Rezervasyon oluşturuldu / onaylandı";
-    let icon = "🟢";
+    let actionText = 'Rezervasyon oluşturuldu';
+    let icon = '🟢';
     let details = op.details;
 
     if (op.status === 'iptal') {
-      actionText = "Rezervasyon iptal edildi";
-      icon = "🔴";
-    } else if (op.status === 'bekliyor') {
-      actionText = "Rezervasyon onaya gönderildi";
-      icon = "🟡";
-      if (op.pendingChanges) {
-        details = op.pendingChanges.details; 
-      }
+      actionText = 'Rezervasyon iptal edildi';
+      icon = '🔴';
     } else if (isCompleted) {
-      actionText = "Toplantı tamamlandı";
-      icon = "✅";
+      actionText = 'Toplantı tamamlandı';
+      icon = '✅';
     } else if (op.status === 'aktif') {
-      actionText = "Rezervasyon oluşturuldu / onaylandı";
-      icon = "🟢";
+      actionText = 'Rezervasyon oluşturuldu';
+      icon = '🟢';
     }
     return { actionText, icon, displayDetails: details.replace(' • ', ' — '), isCompleted };
   };
@@ -652,10 +633,10 @@ export default function Home() {
               </h3>
             </div>
             <div className="p-5">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-6">Yaptığınız değişiklik veritabanına kaydedilerek yönetici onayına sunulacaktır. Onaylanana kadar mevcut rezervasyonunuz geçerli kalacaktır.</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-6">Yaptığınız değişiklik doğrudan rezervasyon kaydına uygulanacaktır.</p>
               <div className="flex justify-end gap-3">
                 <button onClick={() => { setConfirmEditOp(null); setEditingOp(confirmEditOp); }} className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded">Vazgeç</button>
-                <button onClick={handleSendToApproval} className="px-4 py-2 text-sm font-bold bg-[#E4032C] text-white hover:bg-red-700 rounded transition-colors">Onaya Gönder</button>
+                <button onClick={handleSaveEdit} className="px-4 py-2 text-sm font-bold bg-[#E4032C] text-white hover:bg-red-700 rounded transition-colors">Kaydet</button>
               </div>
             </div>
           </div>

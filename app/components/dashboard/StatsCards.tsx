@@ -5,14 +5,14 @@
     description: "Bu ay",
   },
   {
-    title: "Onaylanan",
+    title: "Aktif",
     value: "96",
-    description: "Aktif rezervasyon",
+    description: "Devam eden rezervasyon",
   },
   {
-    title: "Bekleyen",
+    title: "İptal Edilen",
     value: "18",
-    description: "Onay bekliyor",
+    description: "Kayıtlı iptal",
   },
   {
     title: "Toplantı Odası",

@@ -54,14 +54,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Eksik veri gönderdiniz.' }, { status: 400 });
     }
 
-    // BACKEND ZAMAN KONTROLÜ: Geçmiş saate rezervasyon yapılamaz (5 dk tolerans)
     const startObj = new Date(startTime);
-    const bufferTime = new Date(Date.now() - 5 * 60000); 
-    if (startObj < bufferTime) {
-      return NextResponse.json({ error: 'Geçmiş bir tarih veya saat için işlem yapılamaz.' }, { status: 400 });
+    const endObj = new Date(endTime);
+    const now = new Date();
+
+    if (endObj <= now) {
+      return NextResponse.json({ error: 'Rezervasyonun bitiş zamanı şu anki zamandan önce veya eşit olamaz.' }, { status: 400 });
     }
 
-    const initialStatus = role === 'ADMIN' ? 'ACTIVE' : 'PENDING';
+    const startDateOnly = new Date(startObj);
+    startDateOnly.setHours(0, 0, 0, 0);
+    const todayDateOnly = new Date(now);
+    todayDateOnly.setHours(0, 0, 0, 0);
+
+    if (startDateOnly < todayDateOnly) {
+      return NextResponse.json({ error: 'Geçmiş bir tarih için rezervasyon yapılamaz.' }, { status: 400 });
+    }
 
     const newReservation = await prisma.reservation.create({
       data: {
@@ -69,8 +77,8 @@ export async function POST(request: Request) {
         startTime: startObj,
         endTime: new Date(endTime),
         roomId,
-        userId: userId, 
-        status: initialStatus 
+        userId: userId,
+        status: 'ACTIVE'
       },
       include: {
         room: true,
@@ -94,56 +102,49 @@ export async function PATCH(request: Request) {
     if (!userId || userId === 'undefined') return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 401 });
 
     const body = await request.json();
-    const { id, status, action, title, startTime, endTime, roomId } = body;
+    const { id, status, title, startTime, endTime, roomId } = body;
 
     if (!id) return NextResponse.json({ error: 'ID gereklidir.' }, { status: 400 });
 
     const existingReservation = await prisma.reservation.findUnique({ where: { id: id } });
     if (!existingReservation) return NextResponse.json({ error: 'Bulunamadı.' }, { status: 404 });
 
+    if (existingReservation.userId !== userId && role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Yetkiniz yok.' }, { status: 403 });
+    }
+
     const dataToUpdate: any = {};
 
-    // YÖNETİCİ ONAY / RED İŞLEMİ
-    if (role === 'ADMIN' && action === 'APPROVE') {
-      dataToUpdate.title = existingReservation.pendingTitle || existingReservation.title;
-      dataToUpdate.startTime = existingReservation.pendingStartTime || existingReservation.startTime;
-      dataToUpdate.endTime = existingReservation.pendingEndTime || existingReservation.endTime;
-      dataToUpdate.pendingTitle = null;
-      dataToUpdate.pendingStartTime = null;
-      dataToUpdate.pendingEndTime = null;
-      dataToUpdate.status = 'ACTIVE';
-    } 
-    else if (role === 'ADMIN' && action === 'REJECT') {
-      dataToUpdate.pendingTitle = null;
-      dataToUpdate.pendingStartTime = null;
-      dataToUpdate.pendingEndTime = null;
-      dataToUpdate.status = 'ACTIVE';
-    } 
-    // NORMAL KULLANICI / İPTAL VEYA DÜZENLEME İŞLEMİ
-    else {
-      if (existingReservation.userId !== userId && role !== 'ADMIN') {
-        return NextResponse.json({ error: 'Yetkiniz yok.' }, { status: 403 });
+    if (status === 'CANCELLED') {
+      dataToUpdate.status = 'CANCELLED';
+    } else {
+      if (title) dataToUpdate.title = title;
+      if (startTime) {
+        dataToUpdate.startTime = new Date(startTime);
+      }
+      if (endTime) {
+        dataToUpdate.endTime = new Date(endTime);
       }
 
-      if (status === 'CANCELLED') {
-        dataToUpdate.status = 'CANCELLED';
-      } else {
-        // BACKEND ZAMAN KONTROLÜ
-        if (startTime) {
-          const startObj = new Date(startTime);
-          const bufferTime = new Date(Date.now() - 5 * 60000);
-          if (startObj < bufferTime) {
-            return NextResponse.json({ error: 'Geçmiş bir zaman dilimi seçilemez.' }, { status: 400 });
-          }
-        }
+      const finalStart = dataToUpdate.startTime ?? existingReservation.startTime;
+      const finalEnd = dataToUpdate.endTime ?? existingReservation.endTime;
+      const now = new Date();
 
-        if (title) dataToUpdate.pendingTitle = title;
-        if (startTime) dataToUpdate.pendingStartTime = new Date(startTime);
-        if (endTime) dataToUpdate.pendingEndTime = new Date(endTime);
-        if (roomId) dataToUpdate.roomId = roomId;
-
-        dataToUpdate.status = 'PENDING';
+      if (new Date(finalEnd) <= now) {
+        return NextResponse.json({ error: 'Rezervasyonun bitiş zamanı şu anki zamandan önce veya eşit olamaz.' }, { status: 400 });
       }
+
+      const finalStartDateOnly = new Date(finalStart);
+      finalStartDateOnly.setHours(0, 0, 0, 0);
+      const todayDateOnly = new Date(now);
+      todayDateOnly.setHours(0, 0, 0, 0);
+
+      if (finalStartDateOnly < todayDateOnly) {
+        return NextResponse.json({ error: 'Geçmiş bir tarih için rezervasyon yapılamaz.' }, { status: 400 });
+      }
+
+      if (roomId) dataToUpdate.roomId = roomId;
+      dataToUpdate.status = 'ACTIVE';
     }
 
     const updatedReservation = await prisma.reservation.update({

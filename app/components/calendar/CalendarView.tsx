@@ -115,28 +115,7 @@ export default function CalendarView() {
   };
 
   const getAllBlocks = () => {
-    const blocks: any[] = [];
-    operations.forEach((op: any) => {
-      if (op.status === 'iptal') return; 
-      
-      // DÜZELTME: Toplantı tamamlanmışsa (saati geçmişse) takvimde blok olarak gösterme!
-      if (isMeetingCompleted(op)) return;
-      
-      if (op.status === 'bekliyor') {
-        blocks.push({ ...op, displayStatus: 'aktif_eski' });
-        if (op.pendingChanges) {
-          blocks.push({ 
-            ...op, 
-            date: op.pendingChanges.date, 
-            details: op.pendingChanges.details, 
-            displayStatus: 'bekliyor_yeni' 
-          });
-        }
-      } else {
-        blocks.push({ ...op, displayStatus: 'aktif' });
-      }
-    });
-    return blocks.sort((a, b) => a.displayStatus === 'bekliyor_yeni' ? -1 : 1);
+    return operations.filter((op: any) => op.status !== 'iptal' && !isMeetingCompleted(op)).map((op: any) => ({ ...op, displayStatus: 'aktif' }));
   };
 
   const checkIsPastSlot = (slot: string, targetDateStr: string) => {
@@ -223,7 +202,7 @@ export default function CalendarView() {
       const formattedDate = formatDateForList(getLocalYYYYMMDD(selectedDate));
       
       setOperations([{
-        id: Date.now() + Math.floor(Math.random() * 1000), 
+        id: String(Date.now() + Math.floor(Math.random() * 1000)),
         title: localTitle.trim(),
         details: `${localSelection.room.name} • ${timeString}`,
         date: formattedDate,
@@ -293,16 +272,14 @@ export default function CalendarView() {
                     if (resData && !resData.isStart) return null;
 
                     if (resData && resData.isStart) {
-                      const isNewReq = resData.block.displayStatus === 'bekliyor_yeni';
                       return (
                         <div 
                           key={cellKey} 
                           className="h-[88px] border-b border-r border-gray-200 dark:border-[#2d2d2d] bg-white dark:bg-[#1c1c1c] p-1.5" 
                           style={{ gridColumn: `span ${resData.span}` }}
                         >
-                          <div className={`h-full w-full overflow-hidden rounded px-3 py-2 text-left text-xs font-bold text-white shadow-sm flex flex-col items-start ${isNewReq ? 'bg-amber-500 dark:bg-amber-600' : 'bg-[#E4032C]'}`}>
+                          <div className="h-full w-full overflow-hidden rounded px-3 py-2 text-left text-xs font-bold text-white shadow-sm flex flex-col items-start bg-[#E4032C]">
                             <span>{resData.block.title}</span>
-                            {isNewReq && <span className="text-[9px] mt-1 opacity-90 uppercase tracking-wider">Onay Bekliyor</span>}
                           </div>
                         </div>
                       );

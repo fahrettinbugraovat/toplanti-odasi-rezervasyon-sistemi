@@ -70,25 +70,7 @@ export default function CalendarView() {
   };
 
   const getAllBlocks = () => {
-    const blocks: any[] = [];
-    operations.forEach((op: any) => {
-      if (op.status === 'iptal') return; 
-      
-      if (op.status === 'bekliyor') {
-        blocks.push({ ...op, displayStatus: 'aktif_eski' });
-        if (op.pendingChanges) {
-          blocks.push({ 
-            ...op, 
-            date: op.pendingChanges.date, 
-            details: op.pendingChanges.details, 
-            displayStatus: 'bekliyor_yeni' 
-          });
-        }
-      } else {
-        blocks.push({ ...op, displayStatus: 'aktif' });
-      }
-    });
-    return blocks.sort((a, b) => a.displayStatus === 'bekliyor_yeni' ? -1 : 1);
+    return operations.filter((op: any) => op.status !== 'iptal').map((op: any) => ({ ...op, displayStatus: 'aktif' }));
   };
 
   const checkIsPastSlot = (slot: string, targetDateStr: string) => {
@@ -173,17 +155,24 @@ export default function CalendarView() {
     if (!localSelection || !selectedDate || !localTitle.trim()) return;
     
     try {
-      const timeString = formatSelectedSlotsString(localSelection.slots); // Örn: "10:00 - 11:00"
+      const timeString = formatSelectedSlotsString(localSelection.slots);
       const [startStr, endStr] = timeString.split(' - ');
-      
-      // Seçilen tarihi (selectedDate) bozmadan saatlerini ayarlıyoruz
       const startDate = new Date(selectedDate);
       startDate.setHours(parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0, 0);
-      
       const endDate = new Date(selectedDate);
       endDate.setHours(parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0, 0);
 
-      // API'ye (Garsona) Veriyi Gönder (POST)
+      const now = new Date();
+      if (endDate <= now) {
+        showToast({ type: 'error', title: 'Geçersiz Saat', message: 'Rezervasyonun bitiş zamanı şu anki zamandan önce veya eşit olamaz.' });
+        return;
+      }
+
+      if (selectedDate < new Date(new Date().setHours(0, 0, 0, 0)) && endDate <= now) {
+        showToast({ type: 'error', title: 'Geçmiş Tarih', message: 'Geçmiş bir tarihe rezervasyon yapılamaz.' });
+        return;
+      }
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -257,12 +246,10 @@ export default function CalendarView() {
                   if (resData && !resData.isStart) return null;
 
                   if (resData && resData.isStart) {
-                    const isNewReq = resData.block.displayStatus === 'bekliyor_yeni';
                     return (
                       <div key={cellKey} className="h-[88px] border-b border-r border-gray-200 dark:border-[#2d2d2d] bg-white dark:bg-[#1c1c1c] p-1.5" style={{ gridColumn: `span ${resData.span}` }}>
-                        <div className={`h-full w-full overflow-hidden rounded px-3 py-2 text-left text-xs font-bold text-white shadow-sm flex flex-col items-start ${isNewReq ? 'bg-amber-500 dark:bg-amber-600' : 'bg-[#E4032C]'}`}>
+                        <div className="h-full w-full overflow-hidden rounded px-3 py-2 text-left text-xs font-bold text-white shadow-sm flex flex-col items-start bg-[#E4032C]">
                           <span>{resData.block.title}</span>
-                          {isNewReq && <span className="text-[9px] mt-1 opacity-90 uppercase tracking-wider">Onay Bekliyor</span>}
                         </div>
                       </div>
                     );
