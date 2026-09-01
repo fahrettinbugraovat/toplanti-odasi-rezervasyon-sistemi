@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import Link from 'next/link';
+import { HarButton, HarInput, HarThemeSwitch } from '../components/ui/HarUI';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,7 +22,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, rememberMe })
       });
 
       if (!res.ok) {
@@ -30,15 +31,15 @@ export default function LoginPage() {
       }
 
       window.location.href = '/';
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Giriş başarısız oldu.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${theme === 'dark' ? 'bg-[#111111] text-white' : 'bg-[#f4f4f4] text-[#1f1f1f]'}`}>
+    <div className={`login-page min-h-screen flex flex-col ${theme === 'dark' ? 'bg-[#111111] text-white' : 'bg-[#f4f4f4] text-[#1f1f1f]'}`}>
       <div className="flex-grow flex flex-col items-center justify-center px-4 py-8">
         <div className="mb-7 md:mb-8">
           <img src="/trtlogo.png" alt="TRT Logo" className="h-12 md:h-16 w-auto object-contain" />
@@ -62,43 +63,48 @@ export default function LoginPage() {
               <label className={`mb-2 block text-[0.9rem] font-semibold ${theme === 'dark' ? 'text-[#e6e6e6]' : 'text-[#2a2a2a]'}`}>
                 E-posta
               </label>
-              <div className="relative">
-                <span className={`material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] ${theme === 'dark' ? 'text-[#d2d2d2]' : 'text-[#6b6b6b]'}`}>
-                  person
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ornek@sirket.com"
-                  autoComplete="off"
-                  required
-                  className={`h-[48px] w-full rounded-[6px] border py-2 pl-10 pr-4 text-[0.98rem] focus:outline-none focus:ring-2 focus:ring-[#E4032C] focus:border-[#E4032C] ${theme === 'dark' ? 'bg-[#2b2b2b] border-[#3a3a3a] text-white placeholder:text-[#a1a1a1]' : 'bg-[#f3f3f3] border-[#d4d4d4] text-[#1d1d1d] placeholder:text-[#8a8a8a]'}`}
-                />
-              </div>
+              <HarInput
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="off"
+                color="gray"
+                variant="outlined"
+                size="lg"
+                border={{ radius: '4' }}
+                style={{
+                  height: '48px',
+                  background: theme === 'dark' ? '#2b2b2b' : '#f3f3f3',
+                  borderColor: theme === 'dark' ? '#3a3a3a' : '#d4d4d4',
+                  color: theme === 'dark' ? '#ffffff' : '#1d1d1d',
+                  fontSize: '0.98rem',
+                }}
+                required
+              />
             </div>
 
             <div>
               <label className={`mb-2 block text-[0.9rem] font-semibold ${theme === 'dark' ? 'text-[#e6e6e6]' : 'text-[#2a2a2a]'}`}>
                 Şifre
               </label>
-              <div className="relative">
-                <span className={`material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] ${theme === 'dark' ? 'text-[#d2d2d2]' : 'text-[#6b6b6b]'}`}>
-                  lock
-                </span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                  required
-                  className={`h-[48px] w-full rounded-[6px] border py-2 pl-10 pr-10 text-[0.98rem] focus:outline-none focus:ring-2 focus:ring-[#E4032C] focus:border-[#E4032C] ${theme === 'dark' ? 'bg-[#2b2b2b] border-[#3a3a3a] text-white placeholder:text-[#a1a1a1]' : 'bg-[#f3f3f3] border-[#d4d4d4] text-[#1d1d1d] placeholder:text-[#8a8a8a]'}`}
-                />
-                <span className={`material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[18px] ${theme === 'dark' ? 'text-[#d2d2d2]' : 'text-[#6b6b6b]'}`}>
-                  visibility_off
-                </span>
-              </div>
+              <HarInput
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                color="gray"
+                variant="outlined"
+                size="lg"
+                border={{ radius: '4' }}
+                style={{
+                  height: '48px',
+                  background: theme === 'dark' ? '#2b2b2b' : '#f3f3f3',
+                  borderColor: theme === 'dark' ? '#3a3a3a' : '#d4d4d4',
+                  color: theme === 'dark' ? '#ffffff' : '#1d1d1d',
+                  fontSize: '0.98rem',
+                }}
+                required
+              />
             </div>
 
             <div className="flex items-center pt-0.5">
@@ -114,13 +120,14 @@ export default function LoginPage() {
               </label>
             </div>
 
-            <button
+            <HarButton
               type="submit"
               disabled={isLoading}
+              color="red"
               className={`flex h-[48px] w-full items-center justify-center rounded-[6px] bg-[#E4032C] px-4 text-[0.98rem] font-semibold text-white transition-colors duration-200 hover:bg-[#c90026] disabled:cursor-not-allowed disabled:opacity-70`}
             >
               {isLoading ? 'Yükleniyor...' : 'Giriş Yap'}
-            </button>
+            </HarButton>
 
             <div className="pt-1">
               <div className="flex items-center justify-between border-t border-[#d9d9d9] pt-3">
@@ -131,16 +138,7 @@ export default function LoginPage() {
                   <span>{theme === 'dark' ? 'Koyu Tema' : 'Açık Tema'}</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  aria-label="Tema değiştir"
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-[#4b5563]' : 'bg-[#dfe3e8]'}`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`}
-                  />
-                </button>
+                <HarThemeSwitch theme={theme} toggleTheme={toggleTheme} />
               </div>
             </div>
           </form>

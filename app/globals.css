@@ -96,3 +96,83 @@ body {
   width: 0%;
   transition: width 1.5s ease-out;
 }
+
+.theme-switch-button {
+  width: 3.75rem !important;
+  height: 2rem !important;
+  min-width: 3.75rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: #4b5563 !important;
+  box-shadow: none !important;
+}
+
+.theme-switch-button:hover,
+.theme-switch-button:active {
+  background: #4b5563 !important;
+}
+
+.theme-switch-button > .text {
+  display: flex !important;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.theme-switch-thumb {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: 0.25rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+  transition: transform 150ms ease-in-out;
+}
+
+.theme-switch-button.is-dark .theme-switch-thumb {
+  transform: translateX(1.75rem);
+}
+
+.login-page .har-input-wrapper,
+.login-page .har-input-wrapper > .har-input,
+.login-page .har-input-wrapper > .har-input > .input {
+  width: 100% !important;
+}
+
+.login-page .har-input-wrapper > .har-input > .input > input {
+  width: 100% !important;
+  box-sizing: border-box;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.login-page .har-input-wrapper > .har-input > .icon-element {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.login-page .har-input-wrapper > .har-input > .icon-element > .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  line-height: 0;
+  pointer-events: auto;
+}
+
+.login-page .har-input-wrapper > .har-input > .icon-element > .icon.start {
+  margin-left: 0.75rem;
+  margin-right: auto;
+}
+
+.login-page .har-input-wrapper > .har-input > .icon-element > .icon.end {
+  margin-left: auto;
+  margin-right: 0.75rem;
+}

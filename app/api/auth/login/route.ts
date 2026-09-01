@@ -5,7 +5,7 @@ import { createToken } from '../../../lib/jwt'; // JWT motorunun yolu
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, rememberMe } = body;
 
     if (!email || !password) {
       return NextResponse.json({ error: 'E-posta ve şifre zorunludur.' }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7 // 1 hafta geçerli oturum
+      ...(rememberMe ? { maxAge: 60 * 60 * 24 * 7 } : {})
     });
 
     return response;

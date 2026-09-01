@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '../context/UserContext';
 import { useReservationData } from '../context/ReservationContext';
 import { useToast } from '../context/ToastContext';
+import { HarButton } from '../components/ui/HarUI';
 
 export default function AdminPanelPage() {
   const router = useRouter();
@@ -348,9 +349,9 @@ export default function AdminPanelPage() {
                 <button onClick={handleCancelRoomEdit} className="px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333] rounded transition-colors">
                   {editingRoomId ? 'Vazgeç' : 'Temizle'}
                 </button>
-                <button onClick={handleSaveRoom} className="px-8 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
+                <HarButton onClick={handleSaveRoom} color="red" className="px-8 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
                   {editingRoomId ? 'Değişiklikleri Kaydet' : 'Odayı Ekle'}
-                </button>
+                </HarButton>
               </div>
             </div>
 

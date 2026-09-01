@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
+import { HarButton } from '../components/ui/HarUI';
 
 export default function ProfileSettingsPage() {
   const { user, updateUserProfile, updateProfilePhoto, mounted } = useUser();
@@ -162,9 +163,9 @@ export default function ProfileSettingsPage() {
 
           </div>
           <div className="p-5 md:p-6 border-t border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#1a1a1a] flex justify-end">
-            <button onClick={handleProfileSave} className="px-8 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
+            <HarButton onClick={handleProfileSave} color="red" className="px-8 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
               Kaydet
-            </button>
+            </HarButton>
           </div>
         </div>
 
@@ -204,9 +205,9 @@ export default function ProfileSettingsPage() {
 
           </form>
           <div className="p-5 md:p-6 border-t border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#1a1a1a] flex justify-end">
-            <button onClick={handlePasswordSave} className="px-6 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
+            <HarButton onClick={handlePasswordSave} color="red" className="px-6 py-2.5 bg-[#E4032C] hover:bg-red-700 text-white text-sm font-bold rounded shadow-sm transition-colors">
               Şifreyi Değiştir
-            </button>
+            </HarButton>
           </div>
         </div>
 

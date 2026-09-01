@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useReservationData } from './context/ReservationContext';
 import { useToast } from './context/ToastContext'; 
 import { useUser } from './context/UserContext'; 
+import { HarButton } from './components/ui/HarUI';
 
 const TIME_SLOTS = ["09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00"];
 
@@ -562,7 +563,7 @@ export default function Home() {
               
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={handleCancelInstantRes} className="px-5 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded transition-colors w-full border border-gray-200 dark:border-[#333]">İptal</button>
-                <button onClick={handleConfirmInstantReservation} className="px-5 py-2.5 text-sm font-bold rounded text-white w-full transition-colors bg-[#E4032C] hover:bg-red-700">Hemen Rezerve Et</button>
+                <HarButton onClick={handleConfirmInstantReservation} color="red" className="px-5 py-2.5 text-sm font-bold rounded text-white w-full transition-colors bg-[#E4032C] hover:bg-red-700">Hemen Rezerve Et</HarButton>
               </div>
             </div>
           </div>
@@ -615,7 +616,7 @@ export default function Home() {
                 </div>
                 <div className="flex justify-end gap-3 pt-5 mt-2 border-t border-gray-100 dark:border-[#2d2d2d]">
                   <button onClick={() => setEditingOp(null)} className="px-5 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded">İptal</button>
-                  <button onClick={handlePreSaveEdit} disabled={isSaveDisabled} className={`px-5 py-2.5 text-sm font-bold rounded text-white ${isSaveDisabled ? 'bg-[#E4032C] opacity-50 cursor-not-allowed' : 'bg-[#E4032C] hover:bg-red-700'}`}>Kaydet</button>
+                  <HarButton onClick={handlePreSaveEdit} disabled={isSaveDisabled} color="red" className={`px-5 py-2.5 text-sm font-bold rounded text-white ${isSaveDisabled ? 'bg-[#E4032C] opacity-50 cursor-not-allowed' : 'bg-[#E4032C] hover:bg-red-700'}`}>Kaydet</HarButton>
                 </div>
               </div>
             </div>

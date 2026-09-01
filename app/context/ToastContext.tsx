@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { HarAlert } from '../components/ui/HarUI';
 
 type ToastType = 'success' | 'error';
 
@@ -55,8 +56,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               className="flex flex-col gap-3 pointer-events-none"
             >
               {toasts.map((toast) => (
-                <div
+                <HarAlert
                   key={toast.id}
+                  variant="surface-borderless"
+                  status={toast.type === 'success' ? 'success' : 'danger'}
                   className="pointer-events-auto flex items-start gap-3 w-80 p-4 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#333] rounded-lg shadow-2xl"
                 >
                   <span className={`material-symbols-outlined text-[24px] shrink-0 ${
@@ -76,7 +79,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                   >
                     <span className="material-symbols-outlined text-[20px]">close</span>
                   </button>
-                </div>
+                </HarAlert>
               ))}
             </div>,
             document.body // Doğrudan body etiketine gönderildi

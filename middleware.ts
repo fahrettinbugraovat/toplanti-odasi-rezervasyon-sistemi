@@ -2,19 +2,46 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from './app/lib/jwt'; // Yolu kendi projene göre kontrol et (örn: '@/app/lib/jwt' veya './lib/jwt')
 
+type AuthPayload = {
+  id?: string;
+  userId?: string;
+  role?: string;
+};
+
+const isAuthPayload = (value: unknown): value is AuthPayload => {
+  return typeof value === 'object' && value !== null;
+};
+
 export async function middleware(request: NextRequest) {
-  // 1. Kullanıcının tarayıcısındaki HTTP-Only cookie'yi (Kimlik Kartını) alıyoruz
+  const isApiRequest = request.nextUrl.pathname.startsWith('/api/');
+  const isLoginPage = request.nextUrl.pathname === '/login';
+
+  // Kullanıcının tarayıcındaki HTTP-Only cookie'yi (Kimlik Kartını) alıyoruz
   const token = request.cookies.get('auth_token')?.value;
 
+  if (isLoginPage && !token) {
+    return NextResponse.next();
+  }
+
   if (!token) {
-    return NextResponse.json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' }, { status: 401 });
+    if (isApiRequest) {
+      return NextResponse.json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // 2. Token'ı kendi yazdığımız motorla doğrula
-  const decoded: any = await verifyToken(token);
+  const decoded = await verifyToken(token);
 
-  if (!decoded) {
-    return NextResponse.json({ error: 'Geçersiz veya süresi dolmuş oturum.' }, { status: 401 });
+  if (!decoded || !isAuthPayload(decoded)) {
+    if (isApiRequest) {
+      return NextResponse.json({ error: 'Geçersiz veya süresi dolmuş oturum.' }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  if (isLoginPage) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   // 3. API'ye kimin istek attığını bilmesi için Header ekliyoruz
@@ -36,6 +63,13 @@ export async function middleware(request: NextRequest) {
 // Hangi yolların bu kapıdan geçeceğini belirtiyoruz
 export const config = {
   matcher: [
+    '/',
+    '/login',
+    '/rooms',
+    '/calendar',
+    '/my-meetings',
+    '/profile',
+    '/admin',
     '/api/users',
     '/api/users/:path*',
     '/api/reservations',

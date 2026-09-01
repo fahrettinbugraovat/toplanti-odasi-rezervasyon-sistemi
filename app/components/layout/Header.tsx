@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '../../context/UserContext'; 
+import { HarButton } from '../ui/HarUI';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -67,9 +68,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
             </Link>
           </div>
           {/* Hamburger Menü */}
-          <button onClick={onMenuClick} className="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded hover:bg-gray-100 dark:hover:bg-[#2a2a2a] mr-3">
+          <HarButton onClick={onMenuClick} variant="borderless" color="gray" className="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded hover:bg-gray-100 dark:hover:bg-[#2a2a2a] mr-3">
             <span className="material-symbols-outlined text-[26px]">menu</span>
-          </button>
+          </HarButton>
           <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-wide hidden sm:block transition-colors">
             {getPageTitle()}
           </h1>
@@ -124,9 +125,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </div>
 
                 <div className="py-1 border-t border-gray-200 dark:border-[#2d2d2d]">
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[20px]">logout</span>Çıkış Yap
-                  </button>
+                  <HarButton
+                    onClick={handleLogout}
+                    color="red"
+                    align="left"
+                    icon={{
+                      element: <span className="material-symbols-outlined text-[20px]">logout</span>,
+                      position: 'start',
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 [&>.text]:flex [&>.text]:items-center [&>.text]:gap-3"
+                  >
+                    Çıkış Yap
+                  </HarButton>
                 </div>
               </div>
             )}

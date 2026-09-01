@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Room, useReservationData } from '../../context/ReservationContext';
 import { useToast } from '../../context/ToastContext';
+import { HarButton } from '../ui/HarUI';
 
 const TIME_SLOTS = ["09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00"];
 
@@ -333,9 +334,9 @@ export default function CalendarView() {
               <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1.5">Toplantı Başlığı</label>
               <input value={localTitle} onChange={(event) => setLocalTitle(event.target.value)} placeholder="Örn: Proje İncelemesi" className="w-full border border-gray-300 rounded bg-white p-2.5 text-sm text-gray-900 outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C] dark:border-[#3d3d3d] dark:bg-[#141414] dark:text-white transition-colors" />
             </div>
-            <button onClick={confirmReservation} disabled={!localTitle.trim()} className="mt-6 w-full bg-[#E4032C] py-3 rounded text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+            <HarButton onClick={confirmReservation} disabled={!localTitle.trim()} color="red" className="mt-6 w-full bg-[#E4032C] py-3 rounded text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
               Rezervasyonu Onayla
-            </button>
+            </HarButton>
           </aside>
         )}
       </div>

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@/app/context/ThemeContext'; 
+import { HarThemeSwitch } from '../ui/HarUI';
 
 interface SidebarProps {
   onClose: () => void;
@@ -65,19 +66,19 @@ export default function Sidebar({ onClose, isExpanded = true }: SidebarProps) {
       <div className={`mt-5 flex flex-col gap-1.5 pb-2 ${isExpanded ? 'px-4' : 'px-3'}`}>
         <div className="border-t border-gray-200 dark:border-[#2d2d2d] mb-2 pt-3"></div>
         
-        <div 
+        <div
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Koyu Tema' : 'Açık Tema'}
-          className={`flex items-center ${isExpanded ? 'justify-between p-2.5' : 'justify-center py-2.5'} text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded text-sm font-semibold cursor-pointer transition-colors`}
+          className={`flex items-center ${isExpanded ? 'justify-between p-2.5' : 'justify-center py-2.5'} rounded text-sm font-semibold transition-colors ${theme === 'dark' ? 'text-white hover:text-white' : 'text-[#3b3b3b] hover:text-[#1f1f1f]'}`}
         >
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-[20px]">{theme === 'dark' ? 'dark_mode' : 'light_mode'}</span>
+            <span className={`material-symbols-outlined text-[20px] ${theme === 'dark' ? 'text-white' : 'text-[#8a8a8a]'}`}>
+              {theme === 'dark' ? 'dark_mode' : 'light_mode'}
+            </span>
             {isExpanded && <span className="whitespace-nowrap">{theme === 'dark' ? 'Koyu Tema' : 'Açık Tema'}</span>}
           </div>
           {isExpanded && (
-            <div className={`w-9 h-5 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-[#E4032C]' : 'bg-gray-300'}`}>
-              <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${theme === 'dark' ? 'right-1' : 'left-1'}`}></div>
-            </div>
+            <HarThemeSwitch theme={theme} toggleTheme={toggleTheme} />
           )}
         </div>
 

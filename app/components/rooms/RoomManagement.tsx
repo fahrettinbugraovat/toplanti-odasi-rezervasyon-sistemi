@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useReservationData } from '@/app/context/ReservationContext'; // Yol hatası alırsan '../../context/ReservationContext' yapabilirsin.
+import { HarBadge, HarInput } from '../ui/HarUI';
 
 export default function RoomsPage() {
   const { rooms } = useReservationData();
@@ -24,14 +25,17 @@ export default function RoomsPage() {
         
         {/* ARAMA ÇUBUĞU */}
         <div className="p-4 md:p-5 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#212121]">
-          <div className="relative w-full sm:w-80">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">search</span>
-            <input
+          <div className="w-full sm:w-80">
+            <HarInput
               type="text"
               placeholder="Oda Ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded-lg bg-white dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C] transition-colors"
+              color="gray"
+              variant="outlined"
+              size="lg"
+              border={{ radius: '4' }}
+              className="w-full border border-gray-300 bg-white text-sm text-gray-900 transition-colors dark:border-[#3d3d3d] dark:bg-[#141414] dark:text-white"
             />
           </div>
         </div>
@@ -70,10 +74,14 @@ export default function RoomsPage() {
                   
                   {/* DURUM (Müsait, Dolu vb.) */}
                   <td className="px-4 py-4">
-                    <span className={`inline-flex items-center gap-1.5 font-semibold text-sm ${room.status === 'Müsait' ? 'text-emerald-600 dark:text-emerald-500' : room.status === 'Dolu' ? 'text-red-600 dark:text-red-500' : 'text-amber-500 dark:text-amber-400'}`}>
-                      <span className={`w-2.5 h-2.5 rounded-full ${room.status === 'Müsait' ? 'bg-emerald-500' : room.status === 'Dolu' ? 'bg-red-600' : 'bg-amber-500'}`}></span>
+                    <HarBadge
+                      dot
+                      variant="surface-borderless"
+                      status={room.status === 'Müsait' ? 'success' : room.status === 'Dolu' ? 'danger' : 'warning'}
+                      className={`inline-flex items-center gap-1.5 font-semibold text-sm ${room.status === 'Müsait' ? 'text-emerald-600 dark:text-emerald-500' : room.status === 'Dolu' ? 'text-red-600 dark:text-red-500' : 'text-amber-500 dark:text-amber-400'}`}
+                    >
                       {room.status}
-                    </span>
+                    </HarBadge>
                   </td>
                   
                 </tr>
