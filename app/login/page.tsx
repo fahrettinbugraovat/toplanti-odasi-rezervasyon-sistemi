@@ -25,9 +25,20 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password, rememberMe })
       });
 
+      // API'den dönen yanıtın formatını (JSON mu HTML mi) kontrol ediyoruz
+      const contentType = res.headers.get("content-type");
+
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Giriş başarısız oldu.');
+        if (contentType && contentType.includes("application/json")) {
+          // Yanıt JSON ise backend'in gönderdiği hatayı yakala (Örn: "Şifre yanlış")
+          const data = await res.json();
+          throw new Error(data.error || 'Giriş başarısız oldu.');
+        } else {
+          // Yanıt HTML ise (404/500), kodu çökertecek json() çevirisini atlayıp text olarak al
+          const textError = await res.text();
+          console.error("API Hatası (HTML döndü):", textError);
+          throw new Error("Sunucuya ulaşılamadı veya API dizini hatalı. Lütfen konsolu kontrol edin.");
+        }
       }
 
       window.location.href = '/';
@@ -42,7 +53,7 @@ export default function LoginPage() {
     <div className={`login-page min-h-screen flex flex-col ${theme === 'dark' ? 'bg-[#111111] text-white' : 'bg-[#f4f4f4] text-[#1f1f1f]'}`}>
       <div className="flex-grow flex flex-col items-center justify-center px-4 py-8">
         <div className="mb-7 md:mb-8">
-          <img src="/trtlogo.png" alt="TRT Logo" className="h-12 md:h-16 w-auto object-contain" />
+          <img src="/trtlogo.png" alt="TRT Logo" className="h-12 md:h-12 w-auto object-contain" />
         </div>
 
         <div className={`w-full max-w-[420px] rounded-[10px] border ${theme === 'dark' ? 'bg-[#1b1b1b] border-[#2b2b2b] shadow-[0_0_0_1px_rgba(255,255,255,0.02)]' : 'bg-[#f5f5f5] border-[#e5e5e5] shadow-[0_0_0_1px_rgba(0,0,0,0.02)]'} p-5 sm:p-6`}>
@@ -145,11 +156,9 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <footer className={`flex w-full items-center justify-between border-t px-6 py-4 text-xs ${theme === 'dark' ? 'border-[#262626] bg-[#111111] text-[#a3a3a3]' : 'border-[#e5e5e5] bg-[#f8f8f8] text-[#666666]'}`}>
-        <span>© 2026 TRT Bilgi Teknolojileri Daire Başkanlığı</span>
-        <Link href="/destek" className="font-medium transition-colors hover:text-[#E4032C]">Destek</Link>
+      <footer className={`flex w-full items-center justify-center border-t px-6 py-4 text-xs ${theme === 'dark' ? 'border-[#262626] bg-[#111111] text-[#a3a3a3]' : 'border-[#e5e5e5] bg-[#f8f8f8] text-[#666666]'}`}>
+        <span className="text-center">© 2026 TRT Bilgi Teknolojileri Daire Başkanlığı</span>
       </footer>
-
     </div>
   );
 }

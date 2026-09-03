@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma'; // Prisma yolunu kendi projene göre ayarla (gerekirse '@/app/lib/prisma' yap)
+import prisma from '../../../lib/prisma'; // Prisma yolunu kendi projene göre ayarla
 import { createToken } from '../../../lib/jwt'; // JWT motorunun yolu
+import bcrypt from 'bcryptjs'; // BCRYPTJS EKLENDİ
 
 export async function POST(request: Request) {
   try {
@@ -16,12 +17,19 @@ export async function POST(request: Request) {
       where: { email: email }
     });
 
-    // 2. Kullanıcı yoksa veya şifre uyuşmuyorsa hata fırlat
-    if (!user || user.password !== password) {
+    // 2. Kullanıcı yoksa güvenlik amacıyla genel bir hata dön
+    if (!user) {
       return NextResponse.json({ error: 'Geçersiz e-posta veya şifre.' }, { status: 401 });
     }
 
-    // 3. Şifre doğru! Kendi yazdığımız motorla JWT Kimlik Kartını oluştur
+    // 3. ŞİFREYİ BCRYPT İLE KONTROL ET (Kritik Güvenlik Güncellemesi)
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return NextResponse.json({ error: 'Geçersiz e-posta veya şifre.' }, { status: 401 });
+    }
+
+    // 4. Şifre doğru! Kendi yazdığımız motorla JWT Kimlik Kartını oluştur
     const token = await createToken({ 
       id: user.id, 
       role: user.role 
@@ -29,7 +37,7 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({ message: 'Giriş başarılı.' }, { status: 200 });
 
-    // 4. Kimlik kartını tarayıcının çerezlerine (Cookie) güvenli bir şekilde yerleştir
+    // 5. Kimlik kartını tarayıcının çerezlerine (Cookie) güvenli bir şekilde yerleştir
     response.cookies.set({
       name: 'auth_token',
       value: token,

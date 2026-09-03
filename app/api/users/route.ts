@@ -3,6 +3,7 @@ import prisma from '../../lib/prisma';
 import fs from 'fs';
 import path from 'path';
 import { headers } from 'next/headers'; 
+import bcrypt from 'bcryptjs'; // BCRYPTJS EKLENDİ
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,7 +18,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Yetkisiz işlem. Kimlik bulunamadı.' }, { status: 401 });
     }
 
-    // KRİTİK DÜZELTME: Gelen ID'yi Prisma'nın anlayacağı tipe (Sayıysa sayıya, metinse metne) çeviriyoruz
     const parsedId = isNaN(Number(userId)) ? userId : Number(userId);
 
     const user = await prisma.user.findUnique({
@@ -45,11 +45,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Yetkisiz işlem. Kimlik bulunamadı.' }, { status: 401 });
     }
 
-    // ID Tipi düzeltmesi
     const parsedId = isNaN(Number(userId)) ? userId : Number(userId);
 
     const body = await request.json();
-    // EKSİK OLAN ŞİFRE (newPassword) EKLENDİ
     const { fullName, username, email, phone, avatarUrl, newPassword } = body;
 
     let finalAvatarUrl = avatarUrl;
@@ -80,7 +78,13 @@ export async function PATCH(request: Request) {
     if (email !== undefined) dataToUpdate.email = email;
     if (phone !== undefined) dataToUpdate.phone = phone;
     if (avatarUrl !== undefined) dataToUpdate.avatarUrl = finalAvatarUrl;
-    if (newPassword !== undefined) dataToUpdate.password = newPassword; // ŞİFRE DB'YE YAZILIYOR
+    
+    // YENİ ŞİFRE GELDİYSE BCRYPT İLE HASHLEYEREK KAYDET
+    if (newPassword !== undefined && newPassword.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+      dataToUpdate.password = hashedPassword;
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: parsedId as any },

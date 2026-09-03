@@ -7,7 +7,14 @@ import { ToastProvider } from './context/ToastContext';
 import { UserProvider } from './context/UserContext'; // EKLENDİ
 
 export const metadata: Metadata = {
-  title: 'RoomReserve',
+  title: {
+    default: 'Oda Rezervasyon Sistemi',
+    template: '%s | Oda Rezervasyon Sistemi',
+  },
+  description: 'Kurumsal Toplantı Odası Rezervasyon Sistemi',
+  icons: {
+    icon: '/trtlogo.png', // TRT logosu sekme ikonu olarak eklendi
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

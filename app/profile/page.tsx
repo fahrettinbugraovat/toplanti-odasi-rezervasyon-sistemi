@@ -1,11 +1,28 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
 import { HarButton } from '../components/ui/HarUI';
 
+// BAŞ HARFLERİ BULAN FONKSİYON EKLENDİ
+const getInitials = (name: string) => {
+  if (!name) return 'K'; // İsim yoksa varsayılan
+
+  // Fazla boşlukları temizleyip kelimeleri ayırıyoruz
+  const nameArray = name.trim().split(' ').filter(Boolean);
+  
+  if (nameArray.length === 0) return 'K';
+  if (nameArray.length === 1) return nameArray[0].charAt(0).toUpperCase();
+  
+  // İlk kelimenin ilk harfi + Son kelimenin ilk harfi
+  const firstInitial = nameArray[0].charAt(0);
+  const lastInitial = nameArray[nameArray.length - 1].charAt(0);
+  
+  return (firstInitial + lastInitial).toUpperCase();
+};
+
 export default function ProfileSettingsPage() {
-  const { user, updateUserProfile, updateProfilePhoto, mounted } = useUser();
+  const { user, updateUserProfile, mounted } = useUser();
   const { showToast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -21,8 +38,6 @@ export default function ProfileSettingsPage() {
     confirmPassword: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (mounted) {
@@ -74,37 +89,6 @@ export default function ProfileSettingsPage() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        showToast({ type: 'error', title: 'Geçersiz Format', message: 'Lütfen sadece resim dosyası seçin.' });
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        try {
-          await updateProfilePhoto(reader.result as string);
-          showToast({ type: 'success', title: 'Profil Fotoğrafı Güncellendi', message: 'Fotoğrafınız sunucuya kaydedildi.' });
-        } catch (error) {
-          showToast({ type: 'error', title: 'Hata', message: 'Fotoğraf yüklenemedi.' });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleRemovePhoto = async () => {
-    try {
-      await updateProfilePhoto(null);
-      showToast({ type: 'success', title: 'Fotoğraf Kaldırıldı', message: 'Fotoğraf sistemden silindi.' });
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (error) {
-      showToast({ type: 'error', title: 'Hata', message: 'Silme işlemi başarısız.' });
-    }
-  };
-
   if (!mounted) return null;
 
   return (
@@ -123,28 +107,19 @@ export default function ProfileSettingsPage() {
           
           <div className="p-6 md:p-8 space-y-8 flex-1">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-gray-200 dark:border-[#333] shrink-0 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
-                {user.profilePhoto ? (
-                  <img src={user.profilePhoto} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="material-symbols-outlined text-[48px] text-gray-400">person</span>
-                )}
+              
+              {/* YENİ AVATAR TASARIMI */}
+              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-white dark:border-[#1c1c1c] shadow-sm shrink-0 bg-[#E4032C] flex items-center justify-center text-white text-4xl font-bold select-none">
+                {getInitials(formData.fullName || user.fullName)}
               </div>
+
               <div className="flex flex-col gap-3 pt-2">
-                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[#2a2a2a] dark:hover:bg-[#333] text-gray-900 dark:text-white text-sm font-bold rounded transition-colors w-max">
-                  Fotoğraf Seç
-                </button>
-                <button onClick={handleRemovePhoto} disabled={!user.profilePhoto} className="px-5 py-2 text-sm font-bold text-[#E4032C] hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-max">
-                  Fotoğrafı Kaldır
-                </button>
               </div>
             </div>
 
             <form autoComplete="off" className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Ad Soyad</label>
-                {/* DÜZELTME: autoComplete kapalı */}
                 <input type="text" autoComplete="off" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C]" />
               </div>
               <div>
@@ -183,7 +158,6 @@ export default function ProfileSettingsPage() {
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Mevcut Şifre</label>
               <div className="relative">
-                {/* DÜZELTME: Chrome'u engellemek için new-password eklendi */}
                 <input type={showPassword ? "text" : "password"} autoComplete="new-password" value={passData.currentPassword} onChange={e => setPassData({...passData, currentPassword: e.target.value})} placeholder="********" className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#3d3d3d] rounded bg-gray-50 dark:bg-[#141414] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#E4032C] focus:ring-1 focus:ring-[#E4032C] pr-10 [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[20px]">{showPassword ? 'visibility_off' : 'visibility'}</span>

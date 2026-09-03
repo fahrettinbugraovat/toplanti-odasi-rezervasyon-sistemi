@@ -5,6 +5,20 @@ import Link from 'next/link';
 import { useUser } from '../../context/UserContext'; 
 import { HarButton } from '../ui/HarUI';
 
+// 1. BAŞ HARFLERİ BULAN FONKSİYONU EKLİYORUZ
+const getInitials = (name: string) => {
+  if (!name) return 'K';
+
+  const nameArray = name.trim().split(' ').filter(Boolean);
+  if (nameArray.length === 0) return 'K';
+  if (nameArray.length === 1) return nameArray[0].charAt(0).toUpperCase();
+  
+  const firstInitial = nameArray[0].charAt(0);
+  const lastInitial = nameArray[nameArray.length - 1].charAt(0);
+  
+  return (firstInitial + lastInitial).toUpperCase();
+};
+
 interface HeaderProps {
   onMenuClick?: () => void;
 }
@@ -39,16 +53,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
-  // 1. LOGIN SAYFASINDA HEADER'I GİZLE
+  // LOGIN SAYFASINDA HEADER'I GİZLE
   if (pathname === '/login') return null;
 
-  // 2. ÇIKIŞ YAPMA (LOGOUT) FONKSİYONU
+  // ÇIKIŞ YAPMA (LOGOUT) FONKSİYONU
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setIsProfileOpen(false);
-      // Soft navigation yerine tarayıcıyı zorla yenileyerek Login sayfasına gönderiyoruz
-      // (Eski UserContext verilerinin tamamen silinmesi için)
       window.location.href = '/login';
     } catch (error) {
       console.error('Çıkış yapılamadı:', error);
@@ -61,13 +73,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
         
         {/* SOL KISIM */}
         <div className="flex items-center">
-          {/* Masaüstü Logo */}
           <div className="hidden md:flex mr-5 items-center">
             <Link href="/" aria-label="Ana sayfa">
               <img src="/trtlogo.png" alt="TRT Logo" className="h-8 w-auto object-contain" />
             </Link>
           </div>
-          {/* Hamburger Menü */}
           <HarButton onClick={onMenuClick} variant="borderless" color="gray" className="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded hover:bg-gray-100 dark:hover:bg-[#2a2a2a] mr-3">
             <span className="material-symbols-outlined text-[26px]">menu</span>
           </HarButton>
@@ -76,35 +86,42 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </h1>
         </div>
         
-        {/* ========================================================= */}
-        {/* ORTA KISIM: MOBİL TRT LOGOSU (SADECE MOBİLDE VE TAM ORTADA) */}
-        {/* ========================================================= */}
+        {/* ORTA KISIM: MOBİL TRT LOGOSU */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:hidden flex items-center justify-center">
           <Link href="/" aria-label="Ana sayfa">
             <img src="/trtlogo.png" alt="TRT Logo" className="h-7 w-auto object-contain" />
           </Link>
         </div>
-        {/* ========================================================= */}
 
         {/* SAĞ KISIM: Profil Menüsü */}
         <div className="flex items-center gap-3 md:gap-5">
           <div className="relative ml-1" ref={profileRef}>
-            <div onClick={() => setIsProfileOpen(!isProfileOpen)} className={`w-9 h-9 md:w-10 md:h-10 rounded-full overflow-hidden border-2 cursor-pointer flex items-center justify-center transition-colors ${isProfileOpen ? 'border-[#E4032C]' : 'border-gray-200 dark:border-[#2d2d2d] hover:border-gray-400'}`}>
-              {mounted && user.profilePhoto ? (
-                <img src={user.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <span className="material-symbols-outlined text-[28px] text-gray-500 dark:text-gray-400">account_circle</span>
-              )}
+            
+            {/* 2. BURASI DEĞİŞTİ: Sağ üstteki yuvarlak ikon */}
+            <div 
+              onClick={() => setIsProfileOpen(!isProfileOpen)} 
+              className={`w-9 h-9 md:w-10 md:h-10 rounded-full overflow-hidden border-2 cursor-pointer flex items-center justify-center transition-colors bg-[#E4032C] text-white font-bold select-none ${isProfileOpen ? 'border-[#E4032C]' : 'border-transparent hover:border-gray-300 dark:hover:border-gray-500'}`}
+            >
+              {mounted ? getInitials(user.fullName) : 'K'}
             </div>
 
             {isProfileOpen && (
               <div className="absolute right-0 mt-3 w-64 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-[#2d2d2d] rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-gray-200 dark:border-[#2d2d2d] bg-gray-50 dark:bg-[#212121] flex flex-col items-start">
-                  <span className="text-sm font-bold text-gray-900 dark:text-white truncate w-full">{mounted ? user.fullName : 'Yükleniyor...'}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate w-full">{mounted ? user.email : ''}</span>
                   
+                  {/* 3. BURAYA DA UFAK BİR AVATAR EKLEDİK (Menü içi daha şık durur) */}
+                  <div className="flex items-center gap-3 w-full mb-3">
+                    <div className="w-10 h-10 rounded-full bg-[#E4032C] text-white font-bold flex items-center justify-center select-none shrink-0 border-2 border-white dark:border-[#1c1c1c]">
+                       {mounted ? getInitials(user.fullName) : 'K'}
+                    </div>
+                    <div className="flex flex-col w-full overflow-hidden">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white truncate w-full">{mounted ? user.fullName : 'Yükleniyor...'}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate w-full">{mounted ? user.email : ''}</span>
+                    </div>
+                  </div>
+
                   {mounted && user.username && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-medium truncate w-full">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium truncate w-full">
                       @{user.username}
                     </span>
                   )}

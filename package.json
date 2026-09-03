@@ -12,13 +12,15 @@
   "dependencies": {
     "@harjs/react-ui": "^2.4.9",
     "@tailwindcss/postcss": "^4.3.3",
+    "bcryptjs": "^3.0.3",
     "next": "16.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",
-    "@types/node": "^20",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.5.4",
@@ -27,6 +29,10 @@
     "postcss": "^8.5.26",
     "prisma": "^5.22.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "ts-node ./prisma/seed.ts"
   }
 }
