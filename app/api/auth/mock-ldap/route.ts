@@ -18,8 +18,13 @@ export async function GET() {
            email: ldapUserEmail,
            username: 'fbovat',
            password: 'ldap_generated_password', // LDAP'ta şifre tutulmaz ama Prisma zorunlu kıldığı için dolduruyoruz
-           role: 'USER' // Geliştirme ortamında test için USER rolü verdik
+           role: 'ADMIN'
          }
+       });
+    } else if (user.role !== 'ADMIN') {
+       user = await prisma.user.update({
+         where: { id: user.id },
+         data: { role: 'ADMIN' }
        });
     }
 

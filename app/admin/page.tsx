@@ -119,7 +119,30 @@ export default function AdminPanelPage() {
     const featuresArray = roomForm.features.split(',').map(f => f.trim()).filter(f => f !== '');
 
     if (editingRoomId) {
-      showToast({ type: 'error', title: 'Hazırlanıyor', message: 'Oda düzenleme altyapısı bir sonraki adımda eklenecek!' });
+      try {
+        const response = await fetch(`/api/rooms/${editingRoomId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: roomForm.name.trim(),
+            capacity: roomForm.capacity.trim(),
+            features: featuresArray
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Oda güncellenemedi');
+
+        setRooms(currentRooms => currentRooms.map(room =>
+          room.id === editingRoomId
+            ? { ...room, ...data, lockEndTime: room.lockEndTime }
+            : room
+        ));
+        handleCancelRoomEdit();
+        showToast({ type: 'success', title: 'Oda Güncellendi', message: 'Oda bilgileri başarıyla güncellendi.' });
+      } catch (error: any) {
+        showToast({ type: 'error', title: 'İşlem Başarısız', message: error.message || 'Oda güncellenirken bir hata oluştu.' });
+      }
       return;
     } 
 
@@ -161,11 +184,33 @@ export default function AdminPanelPage() {
     setRoomForm({ name: '', capacity: '', features: '' });
   };
 
-  const handleConfirmDeleteRoom = () => {
+  const handleConfirmDeleteRoom = async () => {
     if (!deletingRoom) return;
-    
-    showToast({ type: 'error', title: 'Hazırlanıyor', message: 'Oda silme altyapısı bir sonraki adımda eklenecek!' });
-    setDeletingRoom(null);
+
+    const roomId = deletingRoom.id;
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`, { method: 'DELETE' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Oda silme API hatası:', {
+          status: response.status,
+          statusText: response.statusText,
+          roomId,
+          response: data
+        });
+        throw new Error(data.error || data.details || 'Oda silinemedi');
+      }
+
+      setRooms(currentRooms => currentRooms.filter(room => room.id !== roomId));
+      if (editingRoomId === roomId) handleCancelRoomEdit();
+      setDeletingRoom(null);
+      showToast({ type: 'success', title: 'Oda Silindi', message: 'Oda ve ilişkili rezervasyonlar başarıyla silindi.' });
+    } catch (error: any) {
+      console.error('Oda silme işlemi başarısız:', error);
+      setDeletingRoom(null);
+      showToast({ type: 'error', title: 'İşlem Başarısız', message: error.message || 'Oda silinirken bir hata oluştu.' });
+    }
   };
 
   // KURUMSAL İPTAL (SOFT DELETE): Durumu PATCH ile CANCELLED yapıyor

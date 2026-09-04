@@ -72,6 +72,7 @@ export const config = {
     '/admin',
     '/api/users',
     '/api/users/:path*',
+    '/api/rooms/:path*',
     '/api/reservations',
     '/api/reservations/:path*'
   ]
