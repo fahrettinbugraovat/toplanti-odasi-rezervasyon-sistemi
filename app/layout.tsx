@@ -4,7 +4,13 @@ import AppLayout from './components/layout/AppLayout';
 import { ThemeProvider } from './context/ThemeContext';
 import { ReservationProvider } from './context/ReservationContext';
 import { ToastProvider } from './context/ToastContext'; 
-import { UserProvider } from './context/UserContext'; // EKLENDİ
+import { UserProvider } from './context/UserContext';
+
+// 1. Cron fonksiyonunu içeri aktarıyoruz (Dosya yolunun projenle eşleştiğinden emin ol)
+import { startCronJobs } from './lib/cron'; 
+
+// 2. Proje başlar başlamaz arka plan işçisini tetikliyoruz
+startCronJobs();
 
 export const metadata: Metadata = {
   title: {
@@ -40,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
-          <UserProvider> {/* EKLENDİ */}
+          <UserProvider>
             <ReservationProvider>
               <ToastProvider> 
                 <AppLayout>

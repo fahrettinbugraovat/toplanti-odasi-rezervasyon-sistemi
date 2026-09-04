@@ -11,6 +11,27 @@ export async function GET(request: Request) {
     const filterUserId = searchParams.get('userId');
     const filterStatus = searchParams.get('status');
 
+    // ==========================================
+    // OTOMATİK ZAMAN KONTROLÜ (TIMEZONE DÜZELTİLMİŞ)
+    // Süresi dolan ve hala ACTIVE olan rezervasyonları COMPLETED olarak güncelle
+    // ==========================================
+    // Prisma ve veritabanı genellikle tarihleri UTC olarak saklar. 
+    // Karşılaştırma yaparken güvenli olması için new Date() kullanıyoruz.
+    const now = new Date();
+    
+    await prisma.reservation.updateMany({
+      where: {
+        endTime: {
+          lte: now, // Bitiş zamanı şu andan küçük veya eşitse
+        },
+        status: 'ACTIVE', // Sadece aktif olanları güncelle
+      },
+      data: {
+        status: 'COMPLETED',
+      },
+    });
+    // ==========================================
+
     let whereClause: any = {};
 
     if (filterUserId && filterUserId !== 'undefined' && filterUserId !== 'null') {
